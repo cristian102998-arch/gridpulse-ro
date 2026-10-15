@@ -84,7 +84,9 @@ def ingest(
     start: Annotated[
         str | None, typer.Option(help="YYYY-MM-DD, local day. Default: yesterday")
     ] = None,
-    end: Annotated[str | None, typer.Option(help="YYYY-MM-DD, inclusive. Default: start")] = None,
+    end: Annotated[
+        str | None, typer.Option(help="YYYY-MM-DD, inclusive. Default: yesterday")
+    ] = None,
 ) -> None:
     """Fetch a dataset for [start, end] and load it into the raw layer. Safe to re-run."""
     job = JOBS.get((source, dataset))
@@ -92,7 +94,7 @@ def ingest(
         known = ", ".join(f"{s} {d}" for s, d in JOBS)
         raise typer.BadParameter(f"unknown job '{source} {dataset}'. Known: {known}")
     start_day = _parse_date(start)
-    end_day = _parse_date(end) if end else start_day
+    end_day = _parse_date(end)
     settings = get_settings()
     with logged_run(
         settings.database_url, f"ingest {source} {dataset}", settings.runner
