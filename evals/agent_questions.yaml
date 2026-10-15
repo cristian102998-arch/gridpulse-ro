@@ -1,0 +1,132 @@
+# Evaluation set for the "ask the data" agent.
+# Each expected value is computed live by reference_sql, so the eval stays right when the
+# source data is revised. A question passes when a number in the answer matches the reference
+# within tolerance (relative, unless abs_tolerance is set), allowing MWh<->GWh and MW<->GW.
+# kind: unavailable = the right answer is "no data yet" (prices before the ENTSO-E token).
+
+- id: q01
+  question: How much electricity did Romania consume on 13 October 2026?
+  reference_sql: select load_mwh from marts.mart_daily_kpis where local_day = '2026-10-13'
+- id: q02
+  question: Care a fost vârful de consum pe 14 octombrie 2026, în MW?
+  reference_sql: select peak_load_mw from marts.mart_daily_kpis where local_day = '2026-10-14'
+- id: q03
+  question: What share of generation came from renewables on 12 October 2026?
+  reference_sql: select renewable_share_pct from marts.mart_daily_kpis where local_day = '2026-10-12'
+  abs_tolerance: 0.6
+- id: q04
+  question: How much wind energy was produced in September 2026, in GWh?
+  reference_sql: |
+    select sum(generation_mwh) / 1000 from marts.fct_generation_hourly
+    where source_code = 'wind' and local_day between '2026-09-01' and '2026-09-30'
+- id: q05
+  question: Câtă energie solară s-a produs în iulie 2026?
+  reference_sql: |
+    select sum(generation_mwh) from marts.fct_generation_hourly
+    where source_code = 'solar' and local_day between '2026-07-01' and '2026-07-31'
+- id: q06
+  question: Which day in 2025 had the highest electricity consumption, and how much was it?
+  reference_sql: |
+    select load_mwh from marts.mart_daily_kpis
+    where local_day between '2025-01-01' and '2025-12-31' order by load_mwh desc limit 1
+- id: q07
+  question: What was the average daily consumption in January 2026, in MWh?
+  reference_sql: |
+    select avg(load_mwh) from marts.mart_daily_kpis
+    where local_day between '2026-01-01' and '2026-01-31'
+- id: q08
+  question: How many days in 2025 was Romania a net exporter of electricity?
+  reference_sql: |
+    select count(*) from marts.mart_daily_kpis
+    where local_day between '2025-01-01' and '2025-12-31' and generation_minus_load_mwh > 0
+  abs_tolerance: 0
+- id: q09
+  question: Care a fost ponderea medie a regenerabilelor în august 2026?
+  reference_sql: |
+    select 100.0 * sum(generation_mwh) filter (where s.is_renewable) / sum(generation_mwh)
+    from marts.fct_generation_hourly f join marts.dim_source s using (source_code)
+    where s.category = 'generation' and f.local_day between '2026-08-01' and '2026-08-31'
+  abs_tolerance: 0.6
+- id: q10
+  question: How much electricity was consumed on Christmas Day 2025?
+  reference_sql: select load_mwh from marts.mart_daily_kpis where local_day = '2025-12-25'
+- id: q11
+  question: What was the total consumption in 2025, in TWh?
+  reference_sql: |
+    select sum(load_mwh) / 1000000 from marts.mart_daily_kpis
+    where local_day between '2025-01-01' and '2025-12-31'
+  units_extra: [1000000]
+- id: q12
+  question: On 26 October 2025 the clocks went back. How many hours did that day have, and what was the total consumption?
+  reference_sql: select load_mwh from marts.mart_daily_kpis where local_day = '2025-10-26'
+- id: q13
+  question: Ce temperatură medie a fost în România pe 1 februarie 2026?
+  reference_sql: |
+    select avg(temp_actual_c) from marts.fct_weather_hourly where local_day = '2026-02-01'
+  abs_tolerance: 0.3
+- id: q14
+  question: What was the minimum hourly consumption in the week of 5-11 October 2026, in MW?
+  reference_sql: |
+    select min(load_actual_mwh) from marts.fct_load_hourly
+    where local_day between '2026-10-05' and '2026-10-11'
+- id: q15
+  question: How much more electricity did Romania use on Monday 12 October 2026 than on Sunday 11 October 2026?
+  reference_sql: |
+    select max(load_mwh) filter (where local_day = '2026-10-12')
+         - max(load_mwh) filter (where local_day = '2026-10-11')
+    from marts.mart_daily_kpis where local_day in ('2026-10-11', '2026-10-12')
+- id: q16
+  question: Which source produced the most electricity in September 2026, and how many GWh?
+  reference_sql: |
+    select sum(generation_mwh) / 1000 from marts.fct_generation_hourly f
+    join marts.dim_source s using (source_code)
+    where s.category = 'generation' and f.local_day between '2026-09-01' and '2026-09-30'
+    group by source_code order by 1 desc nulls last limit 1  -- nuclear is all null in Sep 2026
+- id: q17
+  question: How much gas-fired generation was there in Q1 2026, in GWh?
+  reference_sql: |
+    select sum(generation_mwh) / 1000 from marts.fct_generation_hourly
+    where source_code = 'gas' and local_day between '2026-01-01' and '2026-03-31'
+- id: q18
+  question: Câte zile libere legale au fost în 2026 care au căzut în timpul săptămânii?
+  reference_sql: |
+    select count(*) from marts.dim_date
+    where year = 2026 and is_holiday and not is_weekend
+  abs_tolerance: 0
+- id: q19
+  question: What was the LightGBM model's average daily forecast error (MAPE) in September 2026?
+  reference_sql: |
+    select avg(mape_lgbm_pct) from marts.mart_forecast_accuracy_daily
+    where local_day between '2026-09-01' and '2026-09-30'
+  abs_tolerance: 0.15
+- id: q20
+  question: In September 2026, was the LightGBM forecast better than the naive last-week forecast? Give both MAPEs.
+  reference_sql: |
+    select avg(mape_naive_168h_pct) from marts.mart_forecast_accuracy_daily
+    where local_day between '2026-09-01' and '2026-09-30'
+  abs_tolerance: 0.15
+- id: q21
+  question: At what local hour was the consumption peak on 13 October 2026, and how high was it?
+  reference_sql: select peak_load_mw from marts.mart_daily_kpis where local_day = '2026-10-13'
+- id: q22
+  question: What was the highest hourly solar output ever recorded in the data, in MW?
+  reference_sql: |
+    select max(generation_mwh) from marts.fct_generation_hourly where source_code = 'solar'
+- id: q23
+  question: What was the average day-ahead electricity price on 13 October 2026?
+  kind: unavailable
+  reference_sql: select count(*) from marts.fct_price_hourly where local_day = '2026-10-13'
+- id: q24
+  question: Cât a produs hidro (lac + fir de apă) în 2025, în TWh?
+  reference_sql: |
+    select sum(generation_mwh) / 1000000 from marts.fct_generation_hourly
+    where source_code in ('hydro_reservoir', 'hydro_ror')
+      and local_day between '2025-01-01' and '2025-12-31'
+  units_extra: [1000000]
+- id: q25
+  question: How many hours in 2025 did solar generation exceed 1,500 MW?
+  reference_sql: |
+    select count(*) from marts.fct_generation_hourly
+    where source_code = 'solar' and generation_mwh > 1500
+      and local_day between '2025-01-01' and '2025-12-31'
+  abs_tolerance: 0

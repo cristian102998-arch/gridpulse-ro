@@ -1,0 +1,68 @@
+// GridPulse RO – DAX measures. Create a table "_Measures" (Enter data, one empty column),
+// then New measure for each block below. Model: see powerbi/README.md.
+
+// 1. Total generation
+Generation GWh =
+DIVIDE ( SUM ( fct_generation_hourly[generation_mwh] ), 1000 )
+
+// 2. Renewable generation (uses the relationship to dim_source)
+Renewable GWh =
+CALCULATE (
+    [Generation GWh],
+    dim_source[is_renewable] = TRUE ()
+)
+
+// 3. Renewable share
+Renewable Share % =
+DIVIDE ( [Renewable GWh], [Generation GWh] )
+
+// 4. Consumption
+Load GWh =
+DIVIDE ( SUM ( fct_load_hourly[load_actual_mwh] ), 1000 )
+
+// 5. Peak hourly load in the current filter context
+Peak Load MW =
+MAX ( fct_load_hourly[load_actual_mwh] )
+
+// 6. Generation minus load (positive = Romania exported)
+Net Position GWh =
+[Generation GWh] - [Load GWh]
+
+// 7. Forecast error of the LightGBM model, MAPE
+LightGBM MAPE % =
+AVERAGEX (
+    FILTER (
+        fct_load_forecast_baseline,
+        NOT ISBLANK ( fct_load_forecast_baseline[forecast_lgbm_mwh] )
+            && NOT ISBLANK ( fct_load_forecast_baseline[load_actual_mwh] )
+    ),
+    ABS ( fct_load_forecast_baseline[load_actual_mwh] - fct_load_forecast_baseline[forecast_lgbm_mwh] )
+        / fct_load_forecast_baseline[load_actual_mwh]
+)
+
+// 8. Same for the seasonal naive baseline
+Naive MAPE % =
+AVERAGEX (
+    FILTER (
+        fct_load_forecast_baseline,
+        NOT ISBLANK ( fct_load_forecast_baseline[forecast_naive_168h_mwh] )
+            && NOT ISBLANK ( fct_load_forecast_baseline[load_actual_mwh] )
+    ),
+    ABS ( fct_load_forecast_baseline[load_actual_mwh] - fct_load_forecast_baseline[forecast_naive_168h_mwh] )
+        / fct_load_forecast_baseline[load_actual_mwh]
+)
+
+// 9. How much better the model is than the baseline (percentage points)
+Model Gain pp =
+( [Naive MAPE %] - [LightGBM MAPE %] ) * 100
+
+// 10. Same period last year, for the trend cards (time intelligence on dim_date)
+Load GWh LY =
+CALCULATE ( [Load GWh], SAMEPERIODLASTYEAR ( dim_date[date_day] ) )
+
+Load YoY % =
+DIVIDE ( [Load GWh] - [Load GWh LY], [Load GWh LY] )
+
+// 11. Average day-ahead price (empty until the ENTSO-E feed is connected)
+Avg Price EUR/MWh =
+AVERAGE ( fct_price_hourly[price_eur_mwh] )

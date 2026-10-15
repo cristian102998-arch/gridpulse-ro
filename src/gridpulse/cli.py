@@ -25,6 +25,8 @@ forecast_app = typer.Typer(help="Day-ahead load forecast.", no_args_is_help=True
 app.add_typer(forecast_app, name="forecast")
 backup_app = typer.Typer(help="Backups of raw, ml and ops tables.", no_args_is_help=True)
 app.add_typer(backup_app, name="backup")
+agent_app = typer.Typer(help="The ask-the-data SQL agent.", no_args_is_help=True)
+app.add_typer(agent_app, name="agent")
 
 JOBS = {
     ("energy-charts", "public-power"): ingest_energy_charts_public_power,
@@ -179,3 +181,107 @@ def backup_restore(
     with psycopg.connect(settings.database_url) as conn:
         counts = restore_backup(conn, root or settings.backup_root, date.fromisoformat(day))
     typer.echo(f"restored {sum(counts.values())} rows; now run dbt build")
+
+
+def _agent_db_url() -> str:
+    import os
+
+    return os.environ.get("AGENT_DATABASE_URL") or get_settings().database_url
+
+
+@agent_app.command("ask")
+def agent_ask(
+    question: str,
+    model: Annotated[
+        str, typer.Option(help="claude-haiku-5-5, claude-sonnet-5-5 or azure:<deployment>")
+    ] = "claude-haiku-5-5",
+    escalate: Annotated[bool, typer.Option(help="Retry on Sonnet if the first model fails")] = True,
+) -> None:
+    """Ask one question and print the answer, the SQL and the cost."""
+    from gridpulse.agent.core import SONNET, ask
+
+    r = ask(question, _agent_db_url(), model=model, escalate_to=SONNET if escalate else None)
+    typer.echo(r.answer)
+    for s in r.sql:
+        typer.echo(f"  SQL: {s['sql']}" + (f"  -> ERROR {s['error']}" if s.get("error") else ""))
+    typer.echo(
+        f"  model={r.model} escalated={r.escalated} cost=${r.usage.cost_usd:.4f} "
+        f"tokens in/out={r.usage.input_tokens}/{r.usage.output_tokens} "
+        f"cache_read={r.usage.cache_read_tokens} time={r.seconds:.1f}s"
+    )
+
+
+@agent_app.command("eval")
+def agent_eval(
+    model: Annotated[
+        str, typer.Option(help="claude-haiku-5-5, claude-sonnet-5-5 or azure:<deployment>")
+    ] = "claude-haiku-5-5",
+    escalate: Annotated[bool, typer.Option(help="Allow escalation to Sonnet")] = False,
+    only: Annotated[str | None, typer.Option(help="Comma-separated question ids")] = None,
+) -> None:
+    """Run the 25-question eval. Expected answers come from reference SQL run as the owner."""
+    from pathlib import Path
+
+    from gridpulse.agent.core import SONNET
+    from gridpulse.agent.evaluate import run_eval, write_report
+
+    settings = get_settings()
+    summary = run_eval(
+        model,
+        SONNET if escalate else None,
+        _agent_db_url(),
+        settings.database_url,
+        only.split(",") if only else None,
+    )
+    path = write_report(summary, Path("evals/results"))
+    for r in summary["results"]:
+        mark = "PASS" if r["passed"] else "FAIL"
+        typer.echo(f"{mark} {r['id']} ({r['model']}, ${r['cost_usd']:.4f}) {r['answer'][:90]}")
+    typer.echo("")
+    typer.echo(
+        f"{summary['passed']}/{summary['total']} passed, "
+        f"${summary['cost_usd']:.4f} total, ${summary['cost_per_question_usd']:.5f}/question, "
+        f"median {summary['median_seconds']:.1f}s, escalations {summary['escalations']}"
+    )
+    typer.echo(f"report: {path}")
+
+
+EXAMPLE_QUESTIONS = [
+    "How much electricity did Romania consume yesterday, and what was the peak?",
+    "What share of Romania's electricity came from renewables last week?",
+    "Which source produced the most electricity last month?",
+    "Cât a produs eolianul în ultimele 7 zile, în GWh?",
+    "How accurate was the LightGBM load forecast last month compared with the naive one?",
+    "On which day in 2025 was consumption highest?",
+]
+
+
+@agent_app.command("warm-cache")
+def agent_warm_cache() -> None:
+    """Answer the example questions once and store them, so the app can show them for free."""
+    from psycopg.types.json import Jsonb
+
+    from gridpulse.agent.core import SONNET, ask
+
+    settings = get_settings()
+    total = 0.0
+    with psycopg.connect(settings.database_url) as conn:
+        for q in EXAMPLE_QUESTIONS:
+            r = ask(q, _agent_db_url(), escalate_to=SONNET)
+            total += r.usage.cost_usd
+            if not r.ok:
+                typer.echo(f"skipped (no answer): {q}")
+                continue
+            conn.execute(
+                """
+                insert into ops.agent_cache (question, answer, sql, model, cost_usd)
+                values (%s, %s, %s, %s, %s)
+                on conflict (question) do update set answer = excluded.answer,
+                    sql = excluded.sql, model = excluded.model, cost_usd = excluded.cost_usd,
+                    created_at = now()
+                """,
+                (q, r.answer, Jsonb(r.sql), r.model, r.usage.cost_usd),
+            )
+            conn.commit()
+            typer.echo(f"cached: {q}")
+    typer.echo(f"total cost ${total:.4f}")

@@ -1,0 +1,43 @@
+name: Agent eval
+
+# Runs the 25-question eval on Haiku when the agent or the eval changes (~$0.04 per run),
+# and on demand for any model (e.g. claude-sonnet-5-5 or azure:<deployment>).
+on:
+  pull_request:
+    paths: ["src/gridpulse/agent/**", "evals/**"]
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "claude-haiku-5-5 | claude-sonnet-5-5 | azure:<deployment>"
+        default: claude-haiku-5-5
+      escalate:
+        description: "Allow escalation to Sonnet"
+        type: boolean
+        default: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}            # owner: computes expected answers
+      AGENT_DATABASE_URL: ${{ secrets.AGENT_DATABASE_URL }}  # read-only role the agent uses
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - name: Run eval
+        run: |
+          FLAG=""; [ "${{ inputs.escalate }}" = "true" ] && FLAG="--escalate"
+          uv run gridpulse agent eval --model "${{ inputs.model || 'claude-haiku-5-5' }}" $FLAG \
+            | tee eval.txt
+          tail -3 eval.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: evals/results/

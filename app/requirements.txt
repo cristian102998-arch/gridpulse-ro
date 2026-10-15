@@ -4,3 +4,5 @@ streamlit==1.66.0
 psycopg[binary]>=3.2
 pandas>=2.2
 altair>=5.5
+anthropic>=1.0
+sqlglot>=27

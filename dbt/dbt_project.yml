@@ -12,6 +12,10 @@ clean-targets: ["target", "dbt_packages"]
 
 models:
   gridpulse:
+    # Descriptions become Postgres comments, so the SQL agent's get_schema can read them.
+    +persist_docs:
+      relation: true
+      columns: true
     staging:
       +schema: staging
       +materialized: view

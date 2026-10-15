@@ -21,3 +21,8 @@ grant select on all tables in schema marts, ops to gridpulse_app;
 -- dbt recreates tables on every run, so grant on future tables too.
 alter default privileges in schema marts grant select on tables to gridpulse_app;
 alter default privileges in schema ops grant select on tables to gridpulse_app;
+
+-- The one write the public app makes: logging chat questions (for the daily caps).
+-- Its connection opens these transactions explicitly as READ WRITE.
+grant insert on ops.agent_log to gridpulse_app;
+grant usage on sequence ops.agent_log_id_seq to gridpulse_app;

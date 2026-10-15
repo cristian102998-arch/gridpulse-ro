@@ -120,3 +120,48 @@ def backtest_summary() -> pd.DataFrame:
         order by mape_pct
         """
     )
+
+
+def secret(name: str, default: str | None = None) -> str | None:
+    """Streamlit secrets first (Community Cloud), then environment variables (VM)."""
+    try:
+        return st.secrets[name]
+    except (FileNotFoundError, KeyError):
+        return os.environ.get(name, default)
+
+
+def database_url() -> str:
+    return _database_url()
+
+
+@st.cache_data(ttl=3600)
+def cached_examples() -> pd.DataFrame:
+    return query("select question, answer, sql, model, cost_usd from ops.agent_cache order by 1")
+
+
+def chat_usage(client_hash: str) -> tuple[int, int]:
+    """Questions asked today (all visitors) and in the last hour by this visitor."""
+    df = query(
+        """
+        select count(*) filter (where asked_at >= date_trunc('day', now())) as today,
+               count(*) filter (where asked_at >= now() - interval '1 hour'
+                                  and client_hash = %(c)s) as mine
+        from ops.agent_log where asked_at >= now() - interval '1 day'
+        """,
+        {"c": client_hash},
+    )
+    return int(df["today"].iloc[0]), int(df["mine"].iloc[0])
+
+
+def log_question(row: dict) -> None:
+    with psycopg.connect(_database_url(), connect_timeout=15) as conn:
+        conn.read_only = False  # BEGIN READ WRITE: the role defaults to read-only
+        conn.execute(
+            """
+            insert into ops.agent_log (client_hash, question, answer, model, escalated, ok,
+                                       n_sql, cost_usd, seconds)
+            values (%(client_hash)s, %(question)s, %(answer)s, %(model)s, %(escalated)s,
+                    %(ok)s, %(n_sql)s, %(cost_usd)s, %(seconds)s)
+            """,
+            row,
+        )
