@@ -1,8 +1,10 @@
 import hashlib
+from contextlib import contextmanager
 from importlib import resources
 from typing import Literal
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 UpsertResult = Literal["inserted", "updated", "unchanged"]
 
@@ -52,3 +54,27 @@ def upsert_energy_charts_day(
     if row is None:
         return "unchanged"
     return "inserted" if row[0] else "updated"
+
+
+@contextmanager
+def logged_run(database_url: str, job: str, runner: str):
+    """Record a job in ops.pipeline_runs. Yields a dict the job can fill with details."""
+    details: dict = {}
+    with psycopg.connect(database_url, autocommit=True) as conn:
+        (run_id,) = conn.execute(
+            "insert into ops.pipeline_runs (job, runner) values (%s, %s) returning run_id",
+            (job, runner),
+        ).fetchone()
+        status = "failed"
+        try:
+            yield details
+            status = "success"
+        except Exception as e:
+            details["error"] = f"{type(e).__name__}: {e}"[:500]
+            raise
+        finally:
+            conn.execute(
+                "update ops.pipeline_runs set finished_at = now(), status = %s, details = %s"
+                " where run_id = %s",
+                (status, Jsonb(details), run_id),
+            )

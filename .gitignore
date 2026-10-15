@@ -6,3 +6,11 @@ __pycache__/
 .env
 data/
 dist/
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+logs/
+.playwright-mcp/
+dbt/.user.yml

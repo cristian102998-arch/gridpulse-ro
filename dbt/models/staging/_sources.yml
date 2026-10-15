@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: energy_charts_public_power
+        description: One row per local day with the Energy-Charts JSON response (CC BY 4.0).
+        loaded_at_field: fetched_at
+        freshness:
+          warn_after: {count: 30, period: hour}
+          error_after: {count: 54, period: hour}

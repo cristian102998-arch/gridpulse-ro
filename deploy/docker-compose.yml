@@ -1,0 +1,96 @@
+# Production stack for the Oracle A1 VM (arm64, 12 GB). Also runs locally with Docker Desktop.
+#   cp deploy/.env.example deploy/.env   # then fill it in
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+#
+# Airflow is reduced to what LocalExecutor needs: metadata DB, api-server, scheduler,
+# dag-processor. No Redis, Celery workers, Flower or triggerer.
+# The Airflow UI listens on 127.0.0.1 only: open it through `ssh -L 8080:localhost:8080`.
+
+x-airflow: &airflow
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.airflow
+  image: gridpulse-airflow:latest
+  restart: unless-stopped
+  env_file: .env
+  environment: &airflow-env
+    GRIDPULSE_RUNNER: airflow
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Bucharest
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@airflow-db/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+  volumes:
+    - ../dags:/opt/airflow/dags:ro
+    - airflow-logs:/opt/airflow/logs
+    - raw-data:/opt/airflow/data
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+
+services:
+  airflow-db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 10
+
+  airflow-init:
+    <<: *airflow
+    restart: "no"
+    command: ["airflow", "db", "migrate"]
+
+  airflow-apiserver:
+    <<: *airflow
+    command: ["airflow", "api-server"]
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on: &after-init
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow
+    command: ["airflow", "scheduler"]
+    depends_on: *after-init
+
+  airflow-dag-processor:
+    <<: *airflow
+    command: ["airflow", "dag-processor"]
+    depends_on: *after-init
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    image: gridpulse-app:latest
+    restart: unless-stopped
+    env_file: .env
+
+  caddy:
+    image: caddy:2.11.2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      GRIDPULSE_DOMAIN: ${GRIDPULSE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [app]
+
+volumes:
+  airflow-db:
+  airflow-logs:
+  raw-data:
+  caddy-data:

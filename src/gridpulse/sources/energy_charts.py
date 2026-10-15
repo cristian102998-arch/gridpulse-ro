@@ -76,8 +76,8 @@ def _is_retryable(exc: BaseException) -> bool:
 
 @retry(
     retry=retry_if_exception(_is_retryable),
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=2, max=30),
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=5, max=120),  # 429s need minutes, not seconds
     reraise=True,
 )
 def fetch_public_power(

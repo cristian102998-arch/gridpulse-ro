@@ -1,0 +1,13 @@
+# Airflow 3 + the gridpulse CLI and dbt in their own virtualenv.
+# A separate venv keeps dbt's pinned dependencies away from Airflow's constraints.
+FROM apache/airflow:3.3.2-python3.12
+
+USER root
+COPY --chown=airflow:root . /opt/gridpulse-src
+USER airflow
+
+RUN python -m venv /opt/airflow/gridpulse-venv \
+    && /opt/airflow/gridpulse-venv/bin/pip install --no-cache-dir /opt/gridpulse-src
+
+ENV PATH="/opt/airflow/gridpulse-venv/bin:${PATH}" \
+    GRIDPULSE_DBT_DIR=/opt/gridpulse-src/dbt

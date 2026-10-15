@@ -1,0 +1,15 @@
+# Connection comes from the standard libpq variables, so the same file works
+# locally (password in pgpass.conf), in CI and in production (Neon).
+gridpulse:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PGHOST', 'localhost') }}"
+      port: "{{ env_var('PGPORT', '5432') | int }}"
+      user: "{{ env_var('PGUSER', 'postgres') }}"
+      password: "{{ env_var('PGPASSWORD', '') }}"
+      dbname: "{{ env_var('PGDATABASE', 'gridpulse') }}"
+      schema: analytics
+      sslmode: "{{ env_var('PGSSLMODE', 'prefer') }}"
+      threads: 4

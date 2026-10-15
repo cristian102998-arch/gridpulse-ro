@@ -1,0 +1,49 @@
+name: Daily pipeline
+
+# Runs the same CLI that Airflow will run later. Once Airflow is live on the VM,
+# this stays as the documented failover (disable the schedule, keep workflow_dispatch).
+on:
+  schedule:
+    - cron: "30 5 * * *"  # 05:30 UTC = 07:30/08:30 in Bucharest, after yesterday is complete
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "First local day (YYYY-MM-DD). Default: 3 days ago"
+        required: false
+      end:
+        description: "Last local day (YYYY-MM-DD). Default: yesterday"
+        required: false
+
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GRIDPULSE_RAW_ROOT: data/raw
+      GRIDPULSE_RUNNER: github
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+
+      - name: Ingest Energy-Charts (re-fetch the last 3 days to catch revisions)
+        run: |
+          START="${{ inputs.start }}"; END="${{ inputs.end }}"
+          START="${START:-$(TZ=Europe/Bucharest date -d '3 days ago' +%F)}"
+          END="${END:-$(TZ=Europe/Bucharest date -d 'yesterday' +%F)}"
+          uv run gridpulse db init
+          uv run gridpulse ingest energy-charts public-power --start "$START" --end "$END"
+
+      - name: dbt build (models + tests)
+        run: |
+          uv run gridpulse db env >> "$GITHUB_ENV"
+          cd dbt && uv run dbt build --profiles-dir . && uv run dbt source freshness --profiles-dir .
+        env:
+          DBT_TARGET: dev

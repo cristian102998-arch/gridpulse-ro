@@ -1,0 +1,16 @@
+energy_charts_name,source_code,source_label,category,is_renewable,display_order
+Nuclear,nuclear,Nuclear,generation,false,1
+Fossil brown coal / lignite,lignite,Lignite,generation,false,2
+Fossil hard coal,hard_coal,Hard coal,generation,false,3
+Fossil gas,gas,Gas,generation,false,4
+Hydro water reservoir,hydro_reservoir,Hydro (reservoir),generation,true,5
+Hydro Run-of-River,hydro_ror,Hydro (run-of-river),generation,true,6
+Wind onshore,wind,Wind,generation,true,7
+Solar,solar,Solar,generation,true,8
+Biomass,biomass,Biomass,generation,true,9
+Battery,battery,Battery (net),storage,false,10
+Load,load,Load,load,,20
+Residual load,residual_load,Residual load,derived,,21
+Cross border electricity trading,cross_border,Cross-border trading (net),trade,,22
+Renewable share of load,renewable_share_load,Renewable share of load (%),derived,,30
+Renewable share of generation,renewable_share_generation,Renewable share of generation (%),derived,,31

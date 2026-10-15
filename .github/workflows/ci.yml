@@ -28,3 +28,10 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -v
+      - name: dbt build on the sample day (2025-10-26, 25 hours)
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          uv run python scripts/load_sample.py
+          uv run gridpulse db env >> "$GITHUB_ENV"
+      - run: uv run dbt build --project-dir dbt --profiles-dir dbt

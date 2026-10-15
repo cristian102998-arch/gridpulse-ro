@@ -1,6 +1,7 @@
 """Ingestion jobs. Each one: fetch -> land raw file -> upsert into Postgres raw schema."""
 
 import logging
+import time
 from collections import Counter
 from datetime import date
 
@@ -16,6 +17,7 @@ from gridpulse.timeutil import date_chunks
 log = logging.getLogger(__name__)
 
 CHUNK_DAYS = 31  # one API call per month of backfill
+PAUSE_SECONDS = 3.0  # Energy-Charts answers 429 after ~20 quick calls
 
 
 def ingest_energy_charts_public_power(
@@ -26,7 +28,9 @@ def ingest_energy_charts_public_power(
         httpx.Client(timeout=60, headers={"User-Agent": "gridpulse-ro"}) as client,
         psycopg.connect(settings.database_url) as conn,
     ):
-        for chunk_start, chunk_end in date_chunks(start, end, CHUNK_DAYS):
+        for i, (chunk_start, chunk_end) in enumerate(date_chunks(start, end, CHUNK_DAYS)):
+            if i:
+                time.sleep(PAUSE_SECONDS)
             try:
                 resp = energy_charts.fetch_public_power(client, country, chunk_start, chunk_end)
             except energy_charts.NoDataError as e:

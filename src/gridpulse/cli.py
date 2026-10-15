@@ -1,12 +1,14 @@
 import logging
+import shlex
 from datetime import date
 from typing import Annotated
 
 import psycopg
 import typer
 
-from gridpulse.config import get_settings
-from gridpulse.db import init_schema
+from gridpulse.alerts import send_alert
+from gridpulse.config import get_settings, pg_env
+from gridpulse.db import init_schema, logged_run
 from gridpulse.ingest import ingest_energy_charts_public_power
 from gridpulse.timeutil import yesterday_local
 
@@ -39,6 +41,21 @@ def db_init() -> None:
     typer.echo("schema ok")
 
 
+@db_app.command("env")
+def db_env(
+    shell: Annotated[bool, typer.Option(help="Print quoted `export` lines for eval")] = False,
+) -> None:
+    """Print DATABASE_URL as PGHOST=... lines (for dbt and $GITHUB_ENV)."""
+    for key, value in pg_env(get_settings().database_url).items():
+        typer.echo(f"export {key}={shlex.quote(value)}" if shell else f"{key}={value}")
+
+
+@app.command()
+def alert(message: str) -> None:
+    """Send an alert (Telegram if configured, otherwise the log)."""
+    send_alert(message)
+
+
 @app.command()
 def ingest(
     source: Annotated[str, typer.Argument(help="e.g. energy-charts")],
@@ -55,5 +72,10 @@ def ingest(
         raise typer.BadParameter(f"unknown job '{source} {dataset}'. Known: {known}")
     start_day = _parse_date(start)
     end_day = _parse_date(end) if end else start_day
-    stats = job(get_settings(), start_day, end_day)
+    settings = get_settings()
+    with logged_run(
+        settings.database_url, f"ingest {source} {dataset}", settings.runner
+    ) as details:
+        stats = job(settings, start_day, end_day)
+        details.update(start=str(start_day), end=str(end_day), **stats)
     typer.echo(" ".join(f"{k}={v}" for k, v in sorted(stats.items())) or "nothing to do")

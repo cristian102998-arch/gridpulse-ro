@@ -1,0 +1,39 @@
+version: 2
+
+seeds:
+  - name: dim_source
+    description: Energy-Charts series names mapped to our source codes and categories.
+    columns:
+      - name: energy_charts_name
+        data_tests: [unique, not_null]
+      - name: source_code
+        data_tests: [unique, not_null]
+      - name: category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [generation, storage, load, derived, trade]
+
+models:
+  - name: stg_energy_charts__public_power
+    description: Energy-Charts public_power unpacked to one row per 15-minute interval and series.
+    columns:
+      - name: interval_start_utc
+        data_tests: [not_null]
+      - name: energy_charts_name
+        description: If Energy-Charts adds a new series, this test fails until dim_source maps it.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_source')
+                field: energy_charts_name
+
+  - name: fct_generation_hourly
+    description: Hourly generation (MWh) per source for Romania. Grain = hour_utc x source_code.
+    columns:
+      - name: hour_utc
+        data_tests: [not_null]
+      - name: source_code
+        data_tests: [not_null]
+      - name: n_quarters
+        description: Quarter-hours with a value. 4 for a complete hour.
