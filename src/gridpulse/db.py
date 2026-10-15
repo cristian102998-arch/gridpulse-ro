@@ -78,3 +78,27 @@ def logged_run(database_url: str, job: str, runner: str):
                 " where run_id = %s",
                 (status, Jsonb(details), run_id),
             )
+
+
+def upsert_entsoe_day(
+    conn: psycopg.Connection, *, dataset: str, area: str, day, xml: str, points: list[dict]
+) -> UpsertResult:
+    row = conn.execute(
+        """
+        insert into raw.entsoe_documents
+            (dataset, area, day, xml, points, n_points, payload_sha256)
+        values (%s, %s, %s, %s, %s, %s, %s)
+        on conflict (dataset, area, day) do update set
+            xml            = excluded.xml,
+            points         = excluded.points,
+            n_points       = excluded.n_points,
+            payload_sha256 = excluded.payload_sha256,
+            fetched_at     = now()
+        where raw.entsoe_documents.payload_sha256 is distinct from excluded.payload_sha256
+        returning (xmax = 0) as inserted
+        """,
+        (dataset, area, day, xml, Jsonb(points), len(points), sha256(xml)),
+    ).fetchone()
+    if row is None:
+        return "unchanged"
+    return "inserted" if row[0] else "updated"

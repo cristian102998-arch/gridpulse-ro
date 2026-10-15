@@ -1,0 +1,6 @@
+# Streamlit Community Cloud installs only this file (it looks next to the app first),
+# so the public mirror does not pull dbt or the ingestion stack.
+streamlit==1.66.0
+psycopg[binary]>=3.2
+pandas>=2.2
+altair>=5.5

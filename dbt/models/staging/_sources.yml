@@ -10,3 +10,6 @@ sources:
         freshness:
           warn_after: {count: 30, period: hour}
           error_after: {count: 54, period: hour}
+      - name: entsoe_documents
+        description: ENTSO-E Transparency Platform responses per dataset and local day.
+        loaded_at_field: fetched_at

@@ -41,3 +41,10 @@ def date_chunks(start: date, end: date, max_days: int) -> list[tuple[date, date]
         chunks.append((cur, chunk_end))
         cur = chunk_end + timedelta(days=1)
     return chunks
+
+
+def days_between(start: date, end: date) -> list[date]:
+    """Inclusive list of days from start to end."""
+    if end < start:
+        raise ValueError(f"end {end} is before start {start}")
+    return [start + timedelta(days=i) for i in range((end - start).days + 1)]

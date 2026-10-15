@@ -10,9 +10,9 @@ import psycopg
 
 from gridpulse import raw_store
 from gridpulse.config import Settings
-from gridpulse.db import upsert_energy_charts_day
-from gridpulse.sources import energy_charts
-from gridpulse.timeutil import date_chunks
+from gridpulse.db import upsert_energy_charts_day, upsert_entsoe_day
+from gridpulse.sources import energy_charts, entsoe
+from gridpulse.timeutil import date_chunks, days_between, local_day_bounds
 
 log = logging.getLogger(__name__)
 
@@ -55,4 +55,47 @@ def ingest_energy_charts_public_power(
                 if not s.is_complete:
                     stats["incomplete_days"] += 1
                     log.warning("%s: incomplete day, %d intervals", s.day, s.n_intervals)
+    return stats
+
+
+ENTSOE_PAUSE_SECONDS = 0.3  # ENTSO-E allows 400 requests/minute per token
+
+
+def ingest_entsoe(settings: Settings, start: date, end: date, dataset: str) -> Counter:
+    """One request per local day, so each raw row covers exactly that day (23/24/25 h)."""
+    if not settings.entsoe_token:
+        raise RuntimeError("ENTSOE_TOKEN is not set (see de-facut.md, step 1)")
+    stats: Counter = Counter()
+    with (
+        httpx.Client(timeout=60, headers={"User-Agent": "gridpulse-ro"}) as client,
+        psycopg.connect(settings.database_url) as conn,
+    ):
+        for i, day in enumerate(days_between(start, end)):
+            if i:
+                time.sleep(ENTSOE_PAUSE_SECONDS)
+            day_start, day_end = local_day_bounds(day)
+            try:
+                xml = entsoe.fetch(client, settings.entsoe_token, dataset, day_start, day_end)
+                points = entsoe.parse_document(xml)
+            except entsoe.NoDataError as e:
+                log.warning("%s %s: no data (%s)", dataset, day, e)
+                stats["no_data_days"] += 1
+                continue
+            raw_store.write_raw(settings.raw_root, "entsoe", dataset, day, xml)
+            rows = [
+                {
+                    "series": p.series,
+                    "is_consumption": p.is_consumption,
+                    "t": p.interval_start_utc.isoformat(),
+                    "res": p.resolution_minutes,
+                    "v": p.value,
+                }
+                for p in points
+                if day_start <= p.interval_start_utc < day_end
+            ]
+            with conn.transaction():
+                result = upsert_entsoe_day(
+                    conn, dataset=dataset, area=entsoe.RO, day=day, xml=xml, points=rows
+                )
+            stats[result] += 1
     return stats

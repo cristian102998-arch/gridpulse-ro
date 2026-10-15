@@ -46,3 +46,61 @@ def generation_hourly(start, end) -> pd.DataFrame:
         """,
         {"start": start, "end": end},
     )
+
+
+@st.cache_data(ttl=600)
+def daily_kpis(days: int = 30) -> pd.DataFrame:
+    return query(
+        "select * from marts.mart_daily_kpis order by local_day desc limit %(n)s", {"n": days}
+    )
+
+
+@st.cache_data(ttl=600)
+def load_vs_forecasts(start, end) -> pd.DataFrame:
+    return query(
+        """
+        select hour_local, load_actual_mwh::float as actual,
+               forecast_naive_168h_mwh::float as naive_168h, forecast_tso_mwh::float as tso
+        from marts.fct_load_forecast_baseline
+        where local_day between %(start)s and %(end)s
+        order by hour_utc
+        """,
+        {"start": start, "end": end},
+    )
+
+
+@st.cache_data(ttl=600)
+def forecast_accuracy() -> pd.DataFrame:
+    return query(
+        """
+        select date_trunc('month', local_day)::date as month,
+               avg(mape_naive_168h_pct)::float as naive_168h, avg(mape_tso_pct)::float as tso
+        from marts.mart_forecast_accuracy_daily group by 1 order by 1
+        """
+    )
+
+
+@st.cache_data(ttl=120)
+def recent_runs(limit: int = 20) -> pd.DataFrame:
+    return query(
+        """
+        select job, runner, status, started_at,
+               to_char(finished_at - started_at, 'MI:SS') as duration, details::text as details
+        from ops.pipeline_runs order by run_id desc limit %(n)s
+        """,
+        {"n": limit},
+    )
+
+
+@st.cache_data(ttl=120)
+def freshness() -> pd.DataFrame:
+    return query(
+        """
+        select 'Energy-Charts generation' as dataset, max(local_day) as latest_day
+        from marts.fct_generation_hourly where n_quarters = 4
+        union all
+        select 'Load (best source)', max(local_day) from marts.fct_load_hourly
+        union all
+        select 'Day-ahead price (ENTSO-E)', max(local_day) from marts.fct_price_hourly
+        """
+    )

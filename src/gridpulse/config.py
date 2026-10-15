@@ -8,6 +8,7 @@ class Settings:
     database_url: str
     raw_root: str
     runner: str
+    entsoe_token: str | None
 
 
 def get_settings() -> Settings:
@@ -18,6 +19,7 @@ def get_settings() -> Settings:
         # Any fsspec URL: a local folder now, abfs://raw@<account>.dfs.core.windows.net later.
         raw_root=os.environ.get("GRIDPULSE_RAW_ROOT", "data/raw"),
         runner=os.environ.get("GRIDPULSE_RUNNER", "local"),  # airflow | github | local
+        entsoe_token=os.environ.get("ENTSOE_TOKEN") or None,
     )
 
 

@@ -35,3 +35,16 @@ jobs:
           uv run python scripts/load_sample.py
           uv run gridpulse db env >> "$GITHUB_ENV"
       - run: uv run dbt build --project-dir dbt --profiles-dir dbt
+
+  dags:
+    # Airflow has its own pinned constraints, so it gets a plain venv, not the uv project.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install "apache-airflow==3.3.2" apache-airflow-providers-standard pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt"
+      - run: python -m pytest tests/test_dag_integrity.py -v -p no:cacheprovider --rootdir . --noconftest

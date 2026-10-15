@@ -1,6 +1,7 @@
 import logging
 import shlex
 from datetime import date
+from functools import partial
 from typing import Annotated
 
 import psycopg
@@ -9,7 +10,8 @@ import typer
 from gridpulse.alerts import send_alert
 from gridpulse.config import get_settings, pg_env
 from gridpulse.db import init_schema, logged_run
-from gridpulse.ingest import ingest_energy_charts_public_power
+from gridpulse.ingest import ingest_energy_charts_public_power, ingest_entsoe
+from gridpulse.sources.entsoe import DATASETS as ENTSOE_DATASETS
 from gridpulse.timeutil import yesterday_local
 
 app = typer.Typer(help="GridPulse RO command line.", no_args_is_help=True)
@@ -18,6 +20,10 @@ app.add_typer(db_app, name="db")
 
 JOBS = {
     ("energy-charts", "public-power"): ingest_energy_charts_public_power,
+    **{
+        ("entsoe", name): partial(ingest_entsoe, dataset=name)
+        for name in ENTSOE_DATASETS  # load-actual, load-forecast, generation, price
+    },
 }
 
 
