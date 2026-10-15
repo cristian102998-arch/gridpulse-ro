@@ -25,6 +25,7 @@ def db_conn():
     except psycopg.OperationalError as e:
         pytest.skip(f"Postgres not reachable: {e}")
     with conn:
-        conn.execute("drop schema if exists raw cascade")
+        for schema in ("raw", "ml", "ops"):
+            conn.execute(f"drop schema if exists {schema} cascade")
         conn.commit()
         yield conn

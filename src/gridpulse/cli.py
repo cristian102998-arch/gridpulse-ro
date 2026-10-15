@@ -23,6 +23,8 @@ db_app = typer.Typer(help="Database commands.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 forecast_app = typer.Typer(help="Day-ahead load forecast.", no_args_is_help=True)
 app.add_typer(forecast_app, name="forecast")
+backup_app = typer.Typer(help="Backups of raw, ml and ops tables.", no_args_is_help=True)
+app.add_typer(backup_app, name="backup")
 
 JOBS = {
     ("energy-charts", "public-power"): ingest_energy_charts_public_power,
@@ -135,3 +137,45 @@ def forecast_predict(
             n = predict_day(conn, day)
             typer.echo(f"{day}: {n} hourly forecasts stored")
         details.update(start=str(first), end=str(last))
+
+
+@backup_app.command("run")
+def backup_run(
+    root: Annotated[
+        str | None, typer.Option(help="fsspec URL. Default: GRIDPULSE_BACKUP_ROOT")
+    ] = None,
+    keep_days: Annotated[int, typer.Option(help="Delete backups older than this")] = 14,
+) -> None:
+    """Write today's backup (gzipped CSV per table + manifest) and drop old ones."""
+    from gridpulse.backup import prune_backups, run_backup
+
+    settings = get_settings()
+    target = root or settings.backup_root
+    day = yesterday_local() + timedelta(days=1)
+    with (
+        logged_run(settings.database_url, "backup run", settings.runner) as details,
+        psycopg.connect(settings.database_url) as conn,
+    ):
+        counts = run_backup(conn, target, day)
+        pruned = prune_backups(target, day, keep_days)
+        details.update(day=str(day), rows=sum(counts.values()), pruned=pruned)
+    typer.echo(f"backup {day}: {sum(counts.values())} rows in {len(counts)} tables -> {target}")
+
+
+@backup_app.command("restore")
+def backup_restore(
+    day: Annotated[str, typer.Argument(help="Backup date, YYYY-MM-DD")],
+    root: Annotated[
+        str | None, typer.Option(help="fsspec URL. Default: GRIDPULSE_BACKUP_ROOT")
+    ] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Confirm replacing the tables")] = False,
+) -> None:
+    """Replace raw, ml and ops in DATABASE_URL with a backup. Then run `dbt build`."""
+    from gridpulse.backup import restore_backup
+
+    if not yes:
+        raise typer.BadParameter("restore replaces existing rows; pass --yes to confirm")
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        counts = restore_backup(conn, root or settings.backup_root, date.fromisoformat(day))
+    typer.echo(f"restored {sum(counts.values())} rows; now run dbt build")

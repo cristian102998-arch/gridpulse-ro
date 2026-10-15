@@ -17,8 +17,14 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      azurite:
+        # Azure Blob emulator: the raw zone and backups use abfs:// in production.
+        image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+        ports: ["10000:10000"]
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gridpulse
+      # Azurite's well-known development account (public, documented by Microsoft).
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

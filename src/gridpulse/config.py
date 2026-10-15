@@ -8,7 +8,8 @@ class Settings:
     database_url: str
     raw_root: str
     runner: str
-    entsoe_token: str | None
+    entsoe_token: str | None = None
+    backup_root: str = "data"
 
 
 def get_settings() -> Settings:
@@ -20,6 +21,7 @@ def get_settings() -> Settings:
         raw_root=os.environ.get("GRIDPULSE_RAW_ROOT", "data/raw"),
         runner=os.environ.get("GRIDPULSE_RUNNER", "local"),  # airflow | github | local
         entsoe_token=os.environ.get("ENTSOE_TOKEN") or None,
+        backup_root=os.environ.get("GRIDPULSE_BACKUP_ROOT", "data"),
     )
 
 

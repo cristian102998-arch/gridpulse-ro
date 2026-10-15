@@ -35,3 +35,10 @@ def test_monthly_backtest_dag_exists():
 
     bag = DagBag(dag_folder=str(DAGS), include_examples=False)
     assert bag.get_dag("gridpulse_backtest_monthly") is not None
+
+
+def test_backup_dag_exists():
+    from airflow.models import DagBag
+
+    bag = DagBag(dag_folder=str(DAGS), include_examples=False)
+    assert bag.get_dag("gridpulse_backup_nightly") is not None
