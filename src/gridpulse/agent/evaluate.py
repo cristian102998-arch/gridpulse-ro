@@ -49,6 +49,15 @@ def number_candidates(text: str) -> set[float]:
     return out
 
 
+PAGE_CITATION = re.compile(r"\b(?:p|pag|page|pagina)\.?\s*\d+", re.IGNORECASE)
+
+
+def grade_document(answer: str, documents: list[dict], question: dict) -> bool:
+    """The right document was retrieved and the answer cites a page."""
+    retrieved = {doc for d in documents for doc, _page in d.get("hits", [])}
+    return question["expected_doc"] in retrieved and bool(PAGE_CITATION.search(answer))
+
+
 def grade(answer: str, expected: float | None, question: dict) -> bool:
     if question.get("kind") == "unavailable":
         return bool(UNAVAILABLE.search(answer))

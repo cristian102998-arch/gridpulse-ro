@@ -26,3 +26,13 @@ alter default privileges in schema ops grant select on tables to gridpulse_app;
 -- Its connection opens these transactions explicitly as READ WRITE.
 grant insert on ops.agent_log to gridpulse_app;
 grant usage on sequence ops.agent_log_id_seq to gridpulse_app;
+
+-- Document search (RAG), where pgvector is installed (Neon). Run after `gridpulse rag ingest`.
+do $$
+begin
+    if exists (select from pg_namespace where nspname = 'rag') then
+        grant usage on schema rag to gridpulse_app;
+        grant select on all tables in schema rag to gridpulse_app;
+        alter default privileges in schema rag grant select on tables to gridpulse_app;
+    end if;
+end $$;

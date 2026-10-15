@@ -30,6 +30,9 @@ How to work:
 do not ask for raw rows and add them up yourself.
 - Dates and hours in questions are local Romanian time unless the user says UTC. Use local_day \
 and hour_local for filtering and grouping.
+- For why/what-happened questions, or when numbers need context, use search_documents (when \
+available) and cite each passage you rely on as (document title, year, p. N). Documents give \
+context; numbers about load, generation and prices come from SQL.
 - If a table has no rows for what was asked (for example prices before the ENTSO-E feed is \
 connected), say the data is not available yet instead of guessing.
 
@@ -51,6 +54,7 @@ class AgentResult:
     seconds: float
     attempts: list[dict] = field(default_factory=list)
     ok: bool = True
+    documents: list[dict] = field(default_factory=list)
 
 
 class _Failed(Exception):
@@ -60,6 +64,7 @@ class _Failed(Exception):
 
 
 def _run_conversation(conv: Conversation, question: str, tools: ToolRunner, usage: Usage) -> str:
+    """Run one model to a final answer, or raise _Failed."""
     sql_errors = 0
     turn = conv.send_user(question)
     for _ in range(MAX_TURNS):
@@ -84,10 +89,10 @@ def _run_conversation(conv: Conversation, question: str, tools: ToolRunner, usag
     raise _Failed(f"no answer after {MAX_TURNS} turns")
 
 
-def make_conversation(model: str) -> Conversation:
+def make_conversation(model: str, tool_specs: list[dict] = TOOL_SPECS) -> Conversation:
     if model.startswith("azure:"):
-        return AzureOpenAIConversation(model.removeprefix("azure:"), SYSTEM_PROMPT, TOOL_SPECS)
-    return ClaudeConversation(model, SYSTEM_PROMPT, TOOL_SPECS)
+        return AzureOpenAIConversation(model.removeprefix("azure:"), SYSTEM_PROMPT, tool_specs)
+    return ClaudeConversation(model, SYSTEM_PROMPT, tool_specs)
 
 
 def ask(
@@ -95,19 +100,25 @@ def ask(
     database_url: str | None = None,
     model: str = HAIKU,
     escalate_to: str | None = SONNET,
-    conversation_factory: Callable[[str], Conversation] = make_conversation,
+    conversation_factory: Callable[..., Conversation] = make_conversation,
 ) -> AgentResult:
     """Answer one question. Escalates once, with a fresh conversation, if the first model fails."""
     database_url = database_url or os.environ.get(
         "AGENT_DATABASE_URL", os.environ.get("DATABASE_URL", "")
     )
     tools = ToolRunner(database_url)
+    specs = tools.tool_specs() if hasattr(tools, "tool_specs") else TOOL_SPECS
     usage = Usage()
     start = time.monotonic()
     attempts = []
     for i, m in enumerate([model, escalate_to] if escalate_to else [model]):
         try:
-            answer = _run_conversation(conversation_factory(m), question, tools, usage)
+            conv = (
+                conversation_factory(m, specs)
+                if conversation_factory is make_conversation
+                else conversation_factory(m)
+            )
+            answer = _run_conversation(conv, question, tools, usage)
             attempts.append({"model": m, "ok": True})
             return AgentResult(
                 answer, m, i > 0, tools.sql_log, usage, time.monotonic() - start, attempts

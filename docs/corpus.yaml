@@ -1,0 +1,22 @@
+# Public documents the agent can search (RAG). Only the URL list is versioned; the PDFs are
+# downloaded into the raw zone by `gridpulse rag ingest`. Add a document = add an entry.
+- id: tel-q3-2025
+  title: Transelectrica – Raport curent, rezultate financiare T3 2025
+  publisher: Transelectrica
+  year: 2025
+  url: https://www.transelectrica.ro/documents/10179/20238932/Raport+curent_Rezultate+financiare+T3+2025_RO.pdf/a6f9b910-7bac-4b30-a25f-034ecd6a1269
+- id: tel-q4-2025-prelim
+  title: Transelectrica – Pachet de raportare T4 2025 (preliminar, neauditat)
+  publisher: Transelectrica
+  year: 2026
+  url: https://m.bvb.ro/infocont/infocont26/TEL_20260226163956_Pachet-raportare-T4-prelim-2025-RO.pdf
+- id: dispecer-vara-2025
+  title: Transelectrica DEN – Planificarea operațională a funcționării SEN în vara 2025
+  publisher: Transelectrica
+  year: 2025
+  url: https://www.transelectrica.ro/documents/10179/92180/Planificarea+operationala+a+functionarii+SEN+in+vara+2025/7a2a709d-752d-4345-8d68-6369ef890f37
+- id: ceer-nr-romania-2019
+  title: ANRE – National Report Romania to CEER/ACER (2019)
+  publisher: ANRE
+  year: 2019
+  url: https://ceer.eu/wp-content/uploads/2024/04/C19_NR_Romania_NL.pdf

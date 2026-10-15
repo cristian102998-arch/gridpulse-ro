@@ -130,3 +130,18 @@
     where source_code = 'solar' and generation_mwh > 1500
       and local_day between '2025-01-01' and '2025-12-31'
   abs_tolerance: 0
+
+# Document questions (RAG). Run only where the rag schema exists. They pass when the agent
+# retrieved a passage from expected_doc and cited a page.
+- id: d01
+  kind: document
+  question: De ce au crescut importurile nete de energie electrică ale României în 2025?
+  expected_doc: tel-q4-2025-prelim
+- id: d02
+  kind: document
+  question: What net profit did Transelectrica report for 2025, according to its preliminary results?
+  expected_doc: tel-q4-2025-prelim
+- id: d03
+  kind: document
+  question: Ce consum mediu a prognozat Dispecerul Energetic Național pentru vara 2025?
+  expected_doc: dispecer-vara-2025

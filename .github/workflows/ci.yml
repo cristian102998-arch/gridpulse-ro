@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        image: pgvector/pgvector:pg18  # Postgres 18 + pgvector, as on Neon
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: gridpulse

@@ -55,6 +55,19 @@ def test_question_file_is_well_formed():
     import yaml
 
     qs = yaml.safe_load(QUESTIONS.read_text(encoding="utf-8"))
-    assert len(qs) == 25
-    assert len({q["id"] for q in qs}) == 25
-    assert all(q["question"] and q["reference_sql"] for q in qs)
+    data_qs = [q for q in qs if q.get("kind") != "document"]
+    doc_qs = [q for q in qs if q.get("kind") == "document"]
+    assert len(data_qs) == 25 and len(doc_qs) == 3
+    assert len({q["id"] for q in qs}) == len(qs)
+    assert all(q["question"] and q["reference_sql"] for q in data_qs)
+    assert all(q["expected_doc"] for q in doc_qs)
+
+
+def test_document_grading():
+    from gridpulse.agent.evaluate import grade_document
+
+    q = {"expected_doc": "tel-q4-2025-prelim"}
+    docs = [{"query": "x", "hits": [("tel-q4-2025-prelim", 32), ("other", 1)]}]
+    assert grade_document("Importurile au crescut (Transelectrica, 2026, p. 32).", docs, q)
+    assert not grade_document("Importurile au crescut.", docs, q)  # no page cited
+    assert not grade_document("(p. 3)", [{"hits": [("other", 3)]}], q)  # wrong document

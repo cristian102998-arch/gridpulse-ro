@@ -27,6 +27,10 @@ backup_app = typer.Typer(help="Backups of raw, ml and ops tables.", no_args_is_h
 app.add_typer(backup_app, name="backup")
 agent_app = typer.Typer(help="The ask-the-data SQL agent.", no_args_is_help=True)
 app.add_typer(agent_app, name="agent")
+rag_app = typer.Typer(
+    help="Search over public energy reports (needs pgvector).", no_args_is_help=True
+)
+app.add_typer(rag_app, name="rag")
 
 JOBS = {
     ("energy-charts", "public-power"): ingest_energy_charts_public_power,
@@ -285,3 +289,28 @@ def agent_warm_cache() -> None:
             conn.commit()
             typer.echo(f"cached: {q}")
     typer.echo(f"total cost ${total:.4f}")
+
+
+@rag_app.command("ingest")
+def rag_ingest() -> None:
+    """Download, parse, chunk and embed every document in docs/corpus.yaml (idempotent)."""
+    from gridpulse import rag
+
+    settings = get_settings()
+    with (
+        logged_run(settings.database_url, "rag ingest", settings.runner) as details,
+        psycopg.connect(settings.database_url) as conn,
+    ):
+        stats = rag.ingest(conn, settings.raw_root)
+        details.update(stats)
+    typer.echo(" ".join(f"{k}={v}" for k, v in stats.items()))
+
+
+@rag_app.command("search")
+def rag_search(query: str, k: int = 5) -> None:
+    """Show the passages the agent would get for a query."""
+    from gridpulse import rag
+
+    with psycopg.connect(get_settings().database_url) as conn:
+        for h in rag.search(conn, query, k):
+            typer.echo(f"{h.score:.3f} {h.title} ({h.year}), p. {h.page}: {h.text[:160]!r}")

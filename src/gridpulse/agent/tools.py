@@ -46,6 +46,22 @@ TOOL_SPECS = [
     },
 ]
 
+SEARCH_DOCUMENTS_SPEC = {
+    "name": "search_documents",
+    "description": (
+        "Search public reports from Transelectrica (the Romanian TSO) and ANRE (the regulator) "
+        "for context the numbers cannot give: explanations, events, outages, investments, "
+        "regulation. Returns the most relevant passages with document title, year and page. "
+        "Query in Romanian or English."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"query": {"type": "string", "description": "What to look for."}},
+        "required": ["query"],
+        "additionalProperties": False,
+    },
+}
+
 SCHEMA_SQL = """
 select c.table_name, c.column_name, c.data_type,
        col_description(format('%I.%I', c.table_schema, c.table_name)::regclass,
@@ -72,6 +88,7 @@ class ToolRunner:
     def __init__(self, database_url: str):
         self.database_url = database_url
         self.sql_log: list[dict] = []
+        self.doc_log: list[dict] = []
         self._schema_cache: str | None = None
 
     def run(self, name: str, args: dict) -> tuple[str, bool]:
@@ -81,6 +98,8 @@ class ToolRunner:
                 return self.get_schema(), False
             if name == "run_sql":
                 return self.run_sql(args.get("sql", "")), False
+            if name == "search_documents":
+                return self.search_documents(args.get("query", "")), False
             return f"unknown tool {name}", True
         except UnsafeSQL as e:
             self.sql_log.append({"sql": args.get("sql"), "error": str(e), "rejected": True})
@@ -122,3 +141,37 @@ class ToolRunner:
         if len(body) > MAX_RESULT_CHARS:
             body = body[:MAX_RESULT_CHARS] + '... (truncated: aggregate in SQL instead)"'
         return body
+
+    def has_documents(self) -> bool:
+        """True when the rag schema exists and holds chunks (pgvector deployments only)."""
+        try:
+            with self._connect() as conn:
+                if conn.execute("select to_regclass('rag.chunks')").fetchone()[0] is None:
+                    return False
+                return conn.execute("select exists (select 1 from rag.chunks)").fetchone()[0]
+        except psycopg.Error:
+            return False
+
+    def tool_specs(self) -> list[dict]:
+        return TOOL_SPECS + ([SEARCH_DOCUMENTS_SPEC] if self.has_documents() else [])
+
+    def search_documents(self, query: str) -> str:
+        from gridpulse import rag
+
+        with self._connect() as conn:
+            hits = rag.search(conn, query[:500], k=5)
+        self.doc_log.append({"query": query, "hits": [(h.doc_id, h.page) for h in hits]})
+        return json.dumps(
+            [
+                {
+                    "title": h.title,
+                    "year": h.year,
+                    "page": h.page,
+                    "url": h.url,
+                    "score": round(h.score, 3),
+                    "text": h.text,
+                }
+                for h in hits
+            ],
+            ensure_ascii=False,
+        )
