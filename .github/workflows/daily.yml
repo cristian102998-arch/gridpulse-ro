@@ -20,6 +20,9 @@ concurrency:
 
 jobs:
   run:
+    # The schedule is off until the warehouse exists: set the repository variable
+    # PIPELINE_ENABLED=true after adding the DATABASE_URL secret. Manual runs always work.
+    if: vars.PIPELINE_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

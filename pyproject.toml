@@ -51,6 +51,9 @@ packages = ["src/gridpulse"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# app/ holds the Streamlit modules (data.py); without this, ruff would guess from whatever
+# folders exist locally (a gitignored data/ folder) and sort imports differently in CI.
+src = ["src", "app"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "DTZ"]
