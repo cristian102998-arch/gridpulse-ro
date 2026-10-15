@@ -17,16 +17,19 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
-      azurite:
-        # Azure Blob emulator: the raw zone and backups use abfs:// in production.
-        image: mcr.microsoft.com/azure-storage/azurite:3.35.0
-        ports: ["10000:10000"]
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gridpulse
       # Azurite's well-known development account (public, documented by Microsoft).
       AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
     steps:
       - uses: actions/checkout@v4
+      - name: Start Azurite (Azure Blob emulator; the raw zone and backups use abfs:// in prod)
+        # Started by hand, not as a service, to pass --skipApiVersionCheck: the Azure SDK sends
+        # a newer API version than Azurite knows and every request would get a 400.
+        run: >-
+          docker run -d --name azurite -p 10000:10000
+          mcr.microsoft.com/azure-storage/azurite:3.35.0
+          azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"

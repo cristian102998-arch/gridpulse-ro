@@ -8,7 +8,7 @@ from gridpulse.db import init_schema, logged_run
 pytestmark = pytest.mark.db
 
 
-def test_backup_then_restore_round_trip(db_conn, dst_day_payload, tmp_path):
+def test_backup_then_restore_round_trip(db_conn, db_url, dst_day_payload, tmp_path):
     import json
 
     from gridpulse.db import upsert_energy_charts_day
@@ -24,7 +24,7 @@ def test_backup_then_restore_round_trip(db_conn, dst_day_payload, tmp_path):
             n_intervals=100,
             is_complete=True,
         )
-    with logged_run(db_conn.info.dsn, "test job", "test"):
+    with logged_run(db_url, "test job", "test"):
         pass
 
     day = date(2026, 10, 15)
@@ -45,7 +45,7 @@ def test_backup_then_restore_round_trip(db_conn, dst_day_payload, tmp_path):
     assert n == 100
 
     # The identity sequence moved past the restored run_id, so new runs do not collide.
-    with logged_run(db_conn.info.dsn, "after restore", "test"):
+    with logged_run(db_url, "after restore", "test"):
         pass
     db_conn.commit()
     assert (

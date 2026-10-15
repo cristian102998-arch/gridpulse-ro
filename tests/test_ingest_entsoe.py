@@ -18,13 +18,13 @@ XML = (Path(__file__).parent / "fixtures" / "entsoe" / "load_actual.xml").read_t
 
 
 @respx.mock
-def test_entsoe_day_lands_once(db_conn, tmp_path, monkeypatch):
+def test_entsoe_day_lands_once(db_conn, db_url, tmp_path, monkeypatch):
     monkeypatch.setattr("gridpulse.ingest.ENTSOE_PAUSE_SECONDS", 0)
     init_schema(db_conn)
     db_conn.commit()
     route = respx.get(entsoe.BASE_URL).mock(return_value=httpx.Response(200, text=XML))
     settings = Settings(
-        database_url=db_conn.info.dsn,
+        database_url=db_url,
         raw_root=str(tmp_path),
         runner="test",
         entsoe_token="tok",
