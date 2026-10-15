@@ -1,4 +1,6 @@
 # Production stack for the Oracle A1 VM (arm64, 12 GB). Also runs locally with Docker Desktop.
+# Locally `--build` builds the images; on the VM the Deploy workflow pulls them from GHCR
+# (GRIDPULSE_IMAGE_PREFIX=ghcr.io/<owner>/gridpulse).
 #   cp deploy/.env.example deploy/.env   # then fill it in
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 #
@@ -10,7 +12,7 @@ x-airflow: &airflow
   build:
     context: ..
     dockerfile: deploy/Dockerfile.airflow
-  image: gridpulse-airflow:latest
+  image: ${GRIDPULSE_IMAGE_PREFIX:-gridpulse}-airflow:latest
   restart: unless-stopped
   env_file: .env
   environment: &airflow-env
@@ -74,7 +76,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.app
-    image: gridpulse-app:latest
+    image: ${GRIDPULSE_IMAGE_PREFIX:-gridpulse}-app:latest
     restart: unless-stopped
     env_file: .env
 

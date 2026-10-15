@@ -314,3 +314,27 @@ def rag_search(query: str, k: int = 5) -> None:
     with psycopg.connect(get_settings().database_url) as conn:
         for h in rag.search(conn, query, k):
             typer.echo(f"{h.score:.3f} {h.title} ({h.year}), p. {h.page}: {h.text[:160]!r}")
+
+
+@app.command("bulletin")
+def bulletin_cmd(
+    day: Annotated[str | None, typer.Option(help="Local day. Default: yesterday")] = None,
+    facts_only: Annotated[bool, typer.Option(help="Print the facts, skip the LLM")] = False,
+) -> None:
+    """Write the morning bulletin for a day (facts from SQL, prose from Claude Haiku)."""
+    import json
+
+    from gridpulse import bulletin
+
+    target = date.fromisoformat(day) if day else yesterday_local()
+    settings = get_settings()
+    with psycopg.connect(settings.database_url) as conn:
+        if facts_only:
+            typer.echo(json.dumps(bulletin.gather_facts(conn, target), indent=2, default=str))
+            return
+        with logged_run(settings.database_url, "bulletin", settings.runner) as details:
+            result = bulletin.generate(conn, target)
+            details.update(day=str(target), source=result["source"], cost_usd=result["cost_usd"])
+    typer.echo(
+        f"{result['headline_en']}\n  source={result['source']} cost=${result['cost_usd']:.5f}"
+    )

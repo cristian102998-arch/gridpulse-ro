@@ -1,6 +1,6 @@
 import streamlit as st
 
-from data import daily_kpis
+from data import bulletin_text, daily_kpis
 
 st.title("Daily bulletin")
 st.caption("What happened in Romania's power system on the last complete day.")
@@ -17,6 +17,22 @@ if day.is_holiday:
 if day.day_hours != 24:
     label += f" · {day.day_hours}-hour day (clock change)"
 st.subheader(label)
+
+text = bulletin_text(day.local_day)
+if text:
+    lang = st.radio(
+        "Language", ["English", "Română"], horizontal=True, label_visibility="collapsed"
+    )
+    ro = lang == "Română"
+    st.markdown(f"**{text['headline_ro'] if ro else text['headline_en']}**")
+    for b in text["bullets_ro"] if ro else text["bullets_en"]:
+        st.markdown(f"- {b}")
+    written_by = (
+        "Claude Haiku, checked against the data"
+        if text["source"] != "template"
+        else ("template (the AI draft failed the number check)")
+    )
+    st.caption(f"Written by {written_by}. Every number comes from SQL.")
 
 
 def delta(col, fmt="{:+,.0f}"):

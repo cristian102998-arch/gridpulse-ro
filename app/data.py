@@ -165,3 +165,9 @@ def log_question(row: dict) -> None:
             """,
             row,
         )
+
+
+@st.cache_data(ttl=600)
+def bulletin_text(day) -> dict | None:
+    df = query("select source, content from ml.bulletins where local_day = %(d)s", {"d": day})
+    return None if df.empty else {"source": df["source"].iloc[0], **df["content"].iloc[0]}

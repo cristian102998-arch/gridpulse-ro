@@ -61,6 +61,11 @@ with DAG(
         bash_command=f"{DBT} build --profiles-dir . --select fct_load_forecast_baseline+",
     )
 
+    write_bulletin = BashOperator(
+        task_id="bulletin",
+        bash_command=f"gridpulse bulletin --day {YESTERDAY}",
+    )
+
     freshness = BashOperator(
         task_id="source_freshness",
         bash_command=f"{DBT} source freshness --profiles-dir .",
@@ -75,12 +80,13 @@ with DAG(
     )
 
     init >> [ingest_energy_charts, ingest_open_meteo] >> dbt_build
-    dbt_build >> forecast >> dbt_forecast_marts >> freshness
+    dbt_build >> forecast >> dbt_forecast_marts >> write_bulletin >> freshness
     [
         ingest_energy_charts,
         ingest_open_meteo,
         dbt_build,
         forecast,
         dbt_forecast_marts,
+        write_bulletin,
         freshness,
     ] >> alert_on_failure

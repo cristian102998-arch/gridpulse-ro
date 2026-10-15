@@ -23,6 +23,7 @@ def test_dags_import_without_errors():
         "dbt_build",
         "forecast_tomorrow",
         "dbt_forecast_marts",
+        "bulletin",
         "source_freshness",
         "alert_on_failure",
     }

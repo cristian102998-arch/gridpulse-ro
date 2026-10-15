@@ -53,3 +53,8 @@ jobs:
           uv run gridpulse forecast predict
           cd dbt && uv run dbt build --profiles-dir . --select fct_load_forecast_baseline+
           uv run dbt source freshness --profiles-dir .
+
+      - name: Morning bulletin (template if no API key)
+        run: uv run gridpulse bulletin
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
