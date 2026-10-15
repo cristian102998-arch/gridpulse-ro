@@ -187,3 +187,15 @@ models:
         description: Lowest hourly day-ahead price, EUR/MWh.
       - name: price_peak_hour
         description: Local start time of the most expensive hour.
+
+  - name: fct_load_anomalies
+    description: "Hours where actual load deviated unusually from the LightGBM forecast. Grain: one row per hour_utc."
+    columns:
+      - name: hour_utc
+        data_tests: [unique, not_null]
+      - name: residual_mwh
+        description: Actual minus forecast load, MWh. Positive = more consumption than expected.
+      - name: robust_z
+        description: Robust z-score of the residual against the previous 28 days (median/MAD).
+      - name: is_anomaly
+        description: True when abs(robust_z) >= 3.5.

@@ -18,6 +18,7 @@ FEATURES = [
     "doy_cos",
     "is_holiday",
     "is_weekend",
+    "near_holiday",
     "lag_48",
     "lag_168",
     "lag_336",
@@ -65,4 +66,11 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out["heating_degrees"] = (16 - out["temp_forecast"]).clip(lower=0)
     out["cooling_degrees"] = (out["temp_forecast"] - 22).clip(lower=0)
     out["local_day"] = local.date
+    # Days next to a public holiday behave like half-holidays (bridge days, Easter week).
+    # Found by looking at the largest forecast anomalies; see ADR 0005.
+    holidays = set(out.loc[out["is_holiday"] == 1, "local_day"])
+    one_day = pd.Timedelta(days=1)
+    out["near_holiday"] = [
+        float((d - one_day) in holidays or (d + one_day) in holidays) for d in out["local_day"]
+    ]
     return out

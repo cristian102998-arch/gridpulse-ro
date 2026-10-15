@@ -25,7 +25,7 @@ PARAMS = {
     "seed": 42,
 }
 NUM_ROUNDS = 600
-MODEL_VERSION = "lgbm-v1"
+MODEL_VERSION = "lgbm-v2"  # v2: near_holiday feature
 
 
 def fit(train: pd.DataFrame) -> lgb.Booster:
