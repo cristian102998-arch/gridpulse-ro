@@ -1,5 +1,7 @@
 # GridPulse RO
 
+[![CI](https://github.com/cristian102998-arch/gridpulse-ro/actions/workflows/ci.yml/badge.svg)](https://github.com/cristian102998-arch/gridpulse-ro/actions/workflows/ci.yml)
+
 **A daily data platform and AI assistant for Romania's power system.** It loads public grid data every morning, models it in a tested warehouse, forecasts tomorrow's electricity demand, and answers questions in plain English or Romanian.
 
 > **Live demo:** _link after deployment_ · **Status:** work in progress, rebuilt in public
