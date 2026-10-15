@@ -60,7 +60,8 @@ def load_vs_forecasts(start, end) -> pd.DataFrame:
     return query(
         """
         select hour_local, load_actual_mwh::float as actual,
-               forecast_naive_168h_mwh::float as naive_168h, forecast_tso_mwh::float as tso
+               forecast_naive_168h_mwh::float as naive_168h, forecast_tso_mwh::float as tso,
+               forecast_lgbm_mwh::float as lgbm
         from marts.fct_load_forecast_baseline
         where local_day between %(start)s and %(end)s
         order by hour_utc
@@ -74,7 +75,8 @@ def forecast_accuracy() -> pd.DataFrame:
     return query(
         """
         select date_trunc('month', local_day)::date as month,
-               avg(mape_naive_168h_pct)::float as naive_168h, avg(mape_tso_pct)::float as tso
+               avg(mape_naive_168h_pct)::float as naive_168h, avg(mape_tso_pct)::float as tso,
+               avg(mape_lgbm_pct)::float as lgbm
         from marts.mart_forecast_accuracy_daily group by 1 order by 1
         """
     )
@@ -102,5 +104,19 @@ def freshness() -> pd.DataFrame:
         select 'Load (best source)', max(local_day) from marts.fct_load_hourly
         union all
         select 'Day-ahead price (ENTSO-E)', max(local_day) from marts.fct_price_hourly
+        """
+    )
+
+
+@st.cache_data(ttl=600)
+def backtest_summary() -> pd.DataFrame:
+    return query(
+        """
+        select model, n_days, test_start, test_end, mape_pct::float as mape,
+               mape_ci_low_pct::float as ci_low, mape_ci_high_pct::float as ci_high,
+               dm_stat::float as dm_stat, dm_p_value::float as p_value
+        from ml.backtest_metrics
+        where run_id = (select max(run_id) from ml.backtest_metrics)
+        order by mape_pct
         """
     )

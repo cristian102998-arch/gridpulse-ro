@@ -40,10 +40,16 @@ jobs:
           END="${END:-$(TZ=Europe/Bucharest date -d 'yesterday' +%F)}"
           uv run gridpulse db init
           uv run gridpulse ingest energy-charts public-power --start "$START" --end "$END"
+          TOMORROW=$(TZ=Europe/Bucharest date -d 'tomorrow' +%F)
+          uv run gridpulse ingest open-meteo temperature --start "$START" --end "$TOMORROW"
 
       - name: dbt build (models + tests)
         run: |
           uv run gridpulse db env >> "$GITHUB_ENV"
-          cd dbt && uv run dbt build --profiles-dir . && uv run dbt source freshness --profiles-dir .
-        env:
-          DBT_TARGET: dev
+          cd dbt && uv run dbt build --profiles-dir .
+
+      - name: Forecast tomorrow, then refresh the forecast marts
+        run: |
+          uv run gridpulse forecast predict
+          cd dbt && uv run dbt build --profiles-dir . --select fct_load_forecast_baseline+
+          uv run dbt source freshness --profiles-dir .

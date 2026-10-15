@@ -38,4 +38,4 @@ else:
         delta_color="off",
         delta_arrow="off",
     )
-    st.dataframe(runs, hide_index=True, use_container_width=True)
+    st.dataframe(runs, hide_index=True, width="stretch")

@@ -42,5 +42,5 @@ chart = (
     )
     .properties(height=420)
 )
-st.altair_chart(chart, use_container_width=True)
+st.altair_chart(chart, width="stretch")
 st.caption("Hourly averages of 15-minute values. Battery is net: negative while charging.")

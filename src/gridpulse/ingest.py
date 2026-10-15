@@ -10,8 +10,8 @@ import psycopg
 
 from gridpulse import raw_store
 from gridpulse.config import Settings
-from gridpulse.db import upsert_energy_charts_day, upsert_entsoe_day
-from gridpulse.sources import energy_charts, entsoe
+from gridpulse.db import upsert_energy_charts_day, upsert_entsoe_day, upsert_open_meteo
+from gridpulse.sources import energy_charts, entsoe, open_meteo
 from gridpulse.timeutil import date_chunks, days_between, local_day_bounds
 
 log = logging.getLogger(__name__)
@@ -98,4 +98,26 @@ def ingest_entsoe(settings: Settings, start: date, end: date, dataset: str) -> C
                     conn, dataset=dataset, area=entsoe.RO, day=day, xml=xml, points=rows
                 )
             stats[result] += 1
+    return stats
+
+
+OPEN_METEO_CHUNK_DAYS = 92
+
+
+def ingest_open_meteo_temperature(settings: Settings, start: date, end: date) -> Counter:
+    """Population-weighted cities, hourly, UTC. `end` may be tomorrow (forecast)."""
+    stats: Counter = Counter()
+    with (
+        httpx.Client(timeout=120, headers={"User-Agent": "gridpulse-ro"}) as client,
+        psycopg.connect(settings.database_url) as conn,
+    ):
+        for i, (chunk_start, chunk_end) in enumerate(
+            date_chunks(start, end, OPEN_METEO_CHUNK_DAYS)
+        ):
+            if i:
+                time.sleep(PAUSE_SECONDS)
+            rows = open_meteo.fetch_temperatures(client, chunk_start, chunk_end)
+            with conn.transaction():
+                stats["upserted"] += upsert_open_meteo(conn, rows, open_meteo.CITIES)
+            stats["rows"] += len(rows)
     return stats

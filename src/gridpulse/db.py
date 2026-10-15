@@ -102,3 +102,45 @@ def upsert_entsoe_day(
     if row is None:
         return "unchanged"
     return "inserted" if row[0] else "updated"
+
+
+def upsert_open_meteo(conn: psycopg.Connection, rows, cities) -> int:
+    """Bulk upsert via COPY into a temp table. Returns the number of rows inserted or changed."""
+    conn.execute(
+        "create temp table if not exists tmp_om"
+        " (like raw.open_meteo_temperature including defaults) on commit drop"
+    )
+    with conn.cursor().copy(
+        "copy tmp_om (city, hour_utc, temp_actual, temp_forecast_d1, temp_forecast_d2) from stdin"
+    ) as copy:
+        for r in rows:
+            copy.write_row(
+                (r.city, r.hour_utc, r.temp_actual, r.temp_forecast_d1, r.temp_forecast_d2)
+            )
+    cur = conn.execute(
+        """
+        insert into raw.open_meteo_temperature
+            (city, hour_utc, temp_actual, temp_forecast_d1, temp_forecast_d2)
+        select city, hour_utc, temp_actual, temp_forecast_d1, temp_forecast_d2 from tmp_om
+        on conflict (city, hour_utc) do update set
+            temp_actual      = excluded.temp_actual,
+            temp_forecast_d1 = excluded.temp_forecast_d1,
+            temp_forecast_d2 = excluded.temp_forecast_d2,
+            fetched_at       = now()
+        where (raw.open_meteo_temperature.temp_actual,
+               raw.open_meteo_temperature.temp_forecast_d1,
+               raw.open_meteo_temperature.temp_forecast_d2)
+            is distinct from (excluded.temp_actual, excluded.temp_forecast_d1,
+                              excluded.temp_forecast_d2)
+        """
+    )
+    for c in cities:
+        conn.execute(
+            """
+            insert into raw.open_meteo_cities (city, lat, lon, population) values (%s, %s, %s, %s)
+            on conflict (city) do update set
+                lat = excluded.lat, lon = excluded.lon, population = excluded.population
+            """,
+            (c.name, c.lat, c.lon, c.population),
+        )
+    return cur.rowcount

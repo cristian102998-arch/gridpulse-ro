@@ -13,3 +13,14 @@ sources:
       - name: entsoe_documents
         description: ENTSO-E Transparency Platform responses per dataset and local day.
         loaded_at_field: fetched_at
+      - name: open_meteo_temperature
+        description: Hourly temperature per city from the Open-Meteo Previous Runs API (CC BY 4.0).
+        loaded_at_field: fetched_at
+      - name: open_meteo_cities
+  - name: ml
+    schema: ml
+    description: Written by `gridpulse forecast backtest|predict` (Python), read here.
+    tables:
+      - name: load_forecasts
+      - name: backtest_predictions
+      - name: backtest_metrics

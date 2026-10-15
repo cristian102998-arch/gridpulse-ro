@@ -87,3 +87,14 @@ models:
     columns:
       - name: local_day
         data_tests: [unique, not_null]
+
+  - name: fct_weather_hourly
+    description: Population-weighted national temperature, actual and as forecast 48 h ahead.
+    columns:
+      - name: hour_utc
+        data_tests: [unique, not_null]
+      - name: temp_forecast_source
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [forecast_48h, forecast_24h, analysis]

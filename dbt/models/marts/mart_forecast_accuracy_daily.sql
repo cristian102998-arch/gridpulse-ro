@@ -1,4 +1,5 @@
--- Daily MAPE (%) of each forecast against actual load. Statistical tests live in Python (S2).
+-- Daily MAPE (%) of each forecast against actual load. CIs and the DM test live in Python
+-- (ml.backtest_metrics); this table feeds the charts.
 
 select
     local_day,
@@ -9,8 +10,14 @@ select
         avg(abs(load_actual_mwh - forecast_tso_mwh) / load_actual_mwh)
             filter (where forecast_tso_mwh is not null) * 100,
         2
-    ) as mape_tso_pct
+    ) as mape_tso_pct,
+    round(
+        avg(abs(load_actual_mwh - forecast_lgbm_mwh) / load_actual_mwh)
+            filter (where forecast_lgbm_mwh is not null) * 100,
+        2
+    ) as mape_lgbm_pct
 from {{ ref('fct_load_forecast_baseline') }}
 where forecast_naive_168h_mwh is not null
+    and load_actual_mwh is not null
     and local_day < (now() at time zone 'Europe/Bucharest')::date
 group by local_day

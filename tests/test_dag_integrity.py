@@ -19,9 +19,19 @@ def test_dags_import_without_errors():
     assert {t.task_id for t in dag.tasks} == {
         "db_init",
         "ingest_energy_charts",
+        "ingest_open_meteo",
         "dbt_build",
+        "forecast_tomorrow",
+        "dbt_forecast_marts",
         "source_freshness",
         "alert_on_failure",
     }
     alert = dag.get_task("alert_on_failure")
     assert alert.trigger_rule == "one_failed"
+
+
+def test_monthly_backtest_dag_exists():
+    from airflow.models import DagBag
+
+    bag = DagBag(dag_folder=str(DAGS), include_examples=False)
+    assert bag.get_dag("gridpulse_backtest_monthly") is not None
