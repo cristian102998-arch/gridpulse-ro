@@ -4,7 +4,7 @@
 
 **A daily data platform and AI assistant for Romania's power system.** It loads public grid data every morning, models it in a tested warehouse, forecasts tomorrow's electricity demand, and answers questions in plain English or Romanian.
 
-> **Live demo:** [gridpulse-ro.streamlit.app](https://gridpulse-ro-d5h6pmzwagutr6majqzw46.streamlit.app/) · **Status:** work in progress, rebuilt in public
+> **Live demo:** [open the app](https://gridpulse-ro-d5h6pmzwagutr6majqzw46.streamlit.app/) · **Status:** work in progress, rebuilt in public
 
 <!-- GIF of the app goes here -->
 
