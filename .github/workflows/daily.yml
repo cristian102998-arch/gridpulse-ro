@@ -46,10 +46,15 @@ jobs:
           TOMORROW=$(TZ=Europe/Bucharest date -d 'tomorrow' +%F)
           uv run gridpulse ingest open-meteo temperature --start "$START" --end "$TOMORROW"
 
-      - name: dbt build (models + tests)
+      # $GITHUB_ENV only reaches later steps, so this must be a step of its own.
+      - name: Point dbt at the warehouse
         run: |
-          uv run gridpulse db env >> "$GITHUB_ENV"
-          cd dbt && uv run dbt build --profiles-dir .
+          uv run gridpulse db env > pg.env
+          echo "::add-mask::$(sed -n 's/^PGPASSWORD=//p' pg.env)"
+          cat pg.env >> "$GITHUB_ENV" && rm pg.env
+
+      - name: dbt build (models + tests)
+        run: cd dbt && uv run dbt build --profiles-dir .
 
       - name: Forecast tomorrow, then refresh the forecast marts
         run: |
