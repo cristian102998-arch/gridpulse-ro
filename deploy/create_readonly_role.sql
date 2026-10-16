@@ -1,5 +1,5 @@
--- Read-only role for the public app (and later the SQL agent): marts + ops, nothing else.
--- Run once as the database owner:
+-- Read-only role for the public app (and later the SQL agent): marts, ops and two ml tables.
+-- Run once as the database owner, after `gridpulse db init` and `dbt build`:
 --   psql "$DATABASE_URL" -v app_password="'...'" -f deploy/create_readonly_role.sql
 
 do $$
@@ -21,6 +21,10 @@ grant select on all tables in schema marts, ops to gridpulse_app;
 -- dbt recreates tables on every run, so grant on future tables too.
 alter default privileges in schema marts grant select on tables to gridpulse_app;
 alter default privileges in schema ops grant select on tables to gridpulse_app;
+
+-- The app's model-quality table and daily bulletin page. The agent stays on marts (sql_guard).
+grant usage on schema ml to gridpulse_app;
+grant select on ml.backtest_metrics, ml.bulletins to gridpulse_app;
 
 -- The one write the public app makes: logging chat questions (for the daily caps).
 -- Its connection opens these transactions explicitly as READ WRITE.
