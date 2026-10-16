@@ -7,6 +7,9 @@ COPY --chown=airflow:root . /opt/gridpulse-src
 # Mount point of the raw-data volume. A new named volume copies this ownership,
 # otherwise it is root-owned and the airflow user cannot write raw files or backups.
 RUN mkdir -p /opt/airflow/data && chown airflow:root /opt/airflow/data
+# LightGBM links against OpenMP at import time.
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 USER airflow
 
 RUN python -m venv /opt/airflow/gridpulse-venv \
