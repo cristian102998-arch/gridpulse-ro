@@ -4,6 +4,9 @@ FROM apache/airflow:3.3.2-python3.12
 
 USER root
 COPY --chown=airflow:root . /opt/gridpulse-src
+# Mount point of the raw-data volume. A new named volume copies this ownership,
+# otherwise it is root-owned and the airflow user cannot write raw files or backups.
+RUN mkdir -p /opt/airflow/data && chown airflow:root /opt/airflow/data
 USER airflow
 
 RUN python -m venv /opt/airflow/gridpulse-venv \
