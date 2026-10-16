@@ -1,5 +1,6 @@
 import logging
 import shlex
+import sys
 from datetime import date, timedelta
 from functools import partial
 from typing import Annotated
@@ -48,6 +49,9 @@ def _parse_date(value: str | None) -> date:
 
 @app.callback()
 def main(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) -> None:
+    # Answers contain Romanian diacritics; the Windows console defaults to cp1252.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",

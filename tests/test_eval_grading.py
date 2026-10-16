@@ -38,6 +38,11 @@ def test_absolute_tolerance_for_percentages_and_counts():
     assert not grade("36 days.", 37, {"abs_tolerance": 0})
 
 
+def test_typographic_minus_is_negative():
+    assert grade("Media a fost de **−2,6 °C**.", -2.56, {"abs_tolerance": 0.3})
+    assert not grade("Media a fost de 2,6 °C.", -2.56, {"abs_tolerance": 0.3})
+
+
 def test_twh_questions_accept_mwh():
     q = {"units_extra": [1000000]}
     assert grade("53.6 TWh", 53.56, q)
@@ -48,6 +53,7 @@ def test_unavailable_answers():
     q = {"kind": "unavailable"}
     assert grade("Day-ahead prices are not available yet.", 0, q)
     assert grade("Nu există încă date despre preț.", 0, q)
+    assert grade("There is no day-ahead price data; the feed isn't connected yet.", 0, q)
     assert not grade("The average price was 95.50 EUR/MWh.", 0, q)
 
 

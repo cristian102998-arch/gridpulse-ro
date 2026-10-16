@@ -77,3 +77,8 @@ def test_dangerous_functions_are_blocked(sql):
 def test_garbage_is_rejected():
     with pytest.raises(UnsafeSQL):
         check_sql("selec * frm")
+
+
+def test_untokenizable_sql_is_rejected_not_raised():
+    with pytest.raises(UnsafeSQL):
+        check_sql("select 'unterminated from marts.dim_source")

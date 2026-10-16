@@ -44,7 +44,7 @@ class CheckedSQL:
 def check_sql(sql: str, max_rows: int = MAX_ROWS) -> CheckedSQL:
     try:
         statements = [s for s in sqlglot.parse(sql, read="postgres") if s is not None]
-    except sqlglot.errors.ParseError as e:
+    except sqlglot.errors.SqlglotError as e:  # ParseError and TokenError (e.g. a stray quote)
         raise UnsafeSQL(f"could not parse the SQL: {e}") from e
     if len(statements) != 1:
         raise UnsafeSQL("send exactly one statement")

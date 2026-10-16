@@ -16,7 +16,8 @@ from gridpulse.agent.core import ask
 QUESTIONS = Path(__file__).resolve().parents[3] / "evals" / "agent_questions.yaml"
 NUMBER = re.compile(r"-?\d(?:[\d.,   ]*\d)?")
 UNAVAILABLE = re.compile(
-    r"not (?:yet )?available|no (?:price )?data|not connected|nu (?:este|sunt|există|am)"
+    r"(?:not|n['’]t) (?:yet )?(?:available|connected)|no (?:[\w-]+ ){0,3}data"
+    r"|nu (?:este|sunt|există|am)"
     r"|indisponibil|lipsesc|nu e(?:ste)? încă",
     re.IGNORECASE,
 )
@@ -29,6 +30,7 @@ def number_candidates(text: str) -> set[float]:
     "146.383" the other way round; both readings are kept and grading picks the match.
     """
     out: set[float] = set()
+    text = text.replace("−", "-")  # typographic minus, e.g. "−2,6 °C"
     for raw in NUMBER.findall(text):
         s = re.sub(r"[   ]", "", raw)
         readings = []
@@ -109,17 +111,26 @@ def run_eval(
         questions = [q for q in questions if q["id"] in only]
     results = []
     with psycopg.connect(owner_url) as conn:
+        has_rag = conn.execute("select to_regclass('rag.chunks') is not null").fetchone()[0]
         for q in questions:
-            row = conn.execute(q["reference_sql"]).fetchone()
-            expected = float(row[0]) if row and row[0] is not None else None
+            is_doc = q.get("kind") == "document"
+            if is_doc and not has_rag:
+                continue  # document questions need `gridpulse rag ingest` first
+            expected = None
+            if not is_doc:
+                row = conn.execute(q["reference_sql"]).fetchone()
+                expected = float(row[0]) if row and row[0] is not None else None
             r = ask(q["question"], database_url, model=model, escalate_to=escalate_to)
+            passed = (
+                grade_document(r.answer, r.documents, q) if is_doc else grade(r.answer, expected, q)
+            )
             results.append(
                 QuestionResult(
                     id=q["id"],
                     question=q["question"],
                     expected=expected,
                     answer=r.answer,
-                    passed=grade(r.answer, expected, q),
+                    passed=passed,
                     model=r.model,
                     escalated=r.escalated,
                     n_sql=len(r.sql),
