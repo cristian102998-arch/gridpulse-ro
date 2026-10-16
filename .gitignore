@@ -7,6 +7,7 @@ __pycache__/
 .env.*
 !.env.example
 deploy/.env
+deploy/app.env
 data/
 dist/
 
