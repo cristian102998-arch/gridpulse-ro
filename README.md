@@ -29,6 +29,12 @@ LightGBM beats the baseline: Diebold-Mariano test on daily errors, p < 0.0001. T
 
 **What did not work as well.** Adding a "next to a public holiday" feature (v2) cut the error on those days from 8.64% to 6.43%, but the gain over the whole year was not significant (p = 0.15). The largest remaining misses are sunny spring middays, when rooftop solar lowers the load the grid sees. Solar irradiance is the next feature to add.
 
+## Power BI report
+
+![Power BI report: overview, generation mix, forecast, weather vs load](powerbi/gridpulse.gif)
+
+The same marts in Power BI: a star schema around `dim_date`, 12 DAX measures (renewable share, year-over-year with a like-for-like cut-off, MAPE of both forecasts on the same hours) and four pages. LightGBM beats the naive forecast in every calendar month; daily load against temperature traces the heating and cooling U, with weekends and public holidays sitting below it. [PDF export](powerbi/gridpulse.pdf) · [how it is built](powerbi/README.md)
+
 ## Architecture
 
 ```mermaid

@@ -40,12 +40,13 @@ AVERAGEX (
         / fct_load_forecast_baseline[load_actual_mwh]
 )
 
-// 8. Same for the seasonal naive baseline
+// 8. Same for the seasonal naive baseline, on the same hours as the model (fair comparison)
 Naive MAPE % =
 AVERAGEX (
     FILTER (
         fct_load_forecast_baseline,
         NOT ISBLANK ( fct_load_forecast_baseline[forecast_naive_168h_mwh] )
+            && NOT ISBLANK ( fct_load_forecast_baseline[forecast_lgbm_mwh] )
             && NOT ISBLANK ( fct_load_forecast_baseline[load_actual_mwh] )
     ),
     ABS ( fct_load_forecast_baseline[load_actual_mwh] - fct_load_forecast_baseline[forecast_naive_168h_mwh] )
@@ -56,12 +57,22 @@ AVERAGEX (
 Model Gain pp =
 ( [Naive MAPE %] - [LightGBM MAPE %] ) * 100
 
-// 10. Same period last year, for the trend cards (time intelligence on dim_date)
+// 10. Same period last year, for the trend cards (time intelligence on dim_date).
+// Capped at the last day with data, so the current (partial) year is compared like for like.
 Load GWh LY =
-CALCULATE ( [Load GWh], SAMEPERIODLASTYEAR ( dim_date[date_day] ) )
+VAR last_day = CALCULATE ( MAX ( fct_load_hourly[local_day] ), REMOVEFILTERS () )
+RETURN
+    CALCULATE (
+        [Load GWh],
+        SAMEPERIODLASTYEAR ( FILTER ( VALUES ( dim_date[date_day] ), dim_date[date_day] <= last_day ) )
+    )
 
+// Only meaningful for a single year (blank when several years are in context)
 Load YoY % =
-DIVIDE ( [Load GWh] - [Load GWh LY], [Load GWh LY] )
+IF (
+    HASONEVALUE ( dim_date[year] ),
+    DIVIDE ( [Load GWh] - [Load GWh LY], [Load GWh LY] )
+)
 
 // 11. Average day-ahead price (empty until the ENTSO-E feed is connected)
 Avg Price EUR/MWh =

@@ -10,7 +10,7 @@ A Power BI Desktop report on the same marts the app uses. Files: `gridpulse.pbix
 4. Select these tables from the `marts` schema:
    `dim_date`, `dim_source`, `fct_generation_hourly`, `fct_load_hourly`, `fct_price_hourly`, `fct_load_forecast_baseline`, `fct_weather_hourly`, `mart_daily_kpis`.
 
-Import keeps the report fast and means Neon is only woken up on refresh.
+Import keeps the report fast and means Neon is only woken up on refresh. Power BI names the tables `marts dim_date` and so on: rename them to drop the `marts ` prefix, since the measures use the bare names.
 
 ## Model (star schema)
 
@@ -31,6 +31,8 @@ Then **Table tools → Mark as date table** on `dim_date` (column `date_day`). T
 ## Measures
 
 Copy them from [`measures.dax`](measures.dax). Format: `% ` measures as Percentage, GWh with 1 decimal.
+
+Both MAPE measures are computed on the same hours (where the LightGBM backtest exists), so they match the backtest: 4.6% vs 7.2%. `Load YoY %` is blank unless a single year is selected, and last year's load is cut at the last day with data, so a partial year is compared like for like.
 
 ## Pages
 
