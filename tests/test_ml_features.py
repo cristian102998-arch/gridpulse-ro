@@ -1,7 +1,11 @@
+from datetime import date
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from gridpulse.ml.features import FEATURES, build_features
+from gridpulse.ml.forecast import check_lag_48
 
 
 def _frame(hours=24 * 40, start="2025-10-01 00:00"):
@@ -48,3 +52,21 @@ def test_gaps_become_hours_not_shifted_rows():
     f = build_features(df)
     assert len(f) == 24 * 40
     assert f.loc["2025-10-07 12:00+00:00", "lag_48"] != f.loc["2025-10-07 12:00+00:00", "lag_48"]
+
+
+def test_autumn_dst_target_day_tolerates_one_missing_lag_48():
+    # Run on the morning of 2026-10-24: load is known up to the end of 10-23 (local),
+    # weather up to 10-25. "Tomorrow" is the 25-hour day 10-25.
+    df = _frame(hours=24 * 30, start="2026-09-28 21:00")
+    df.loc[df.index >= "2026-10-23 21:00+00:00", "load"] = np.nan
+    f = build_features(df)
+    target = f[f["local_day"] == date(2026, 10, 25)]
+    assert len(target) == 25
+    assert target["lag_48"].isna().sum() == 1  # last hour reaches into 10-24 00:00 local
+    check_lag_48(target, date(2026, 10, 25))  # must not raise
+
+    # A whole missing day still means ingest did not run.
+    df.loc[df.index >= "2026-10-22 21:00+00:00", "load"] = np.nan
+    target = build_features(df).pipe(lambda x: x[x["local_day"] == date(2026, 10, 25)])
+    with pytest.raises(RuntimeError, match="ingest first"):
+        check_lag_48(target, date(2026, 10, 25))

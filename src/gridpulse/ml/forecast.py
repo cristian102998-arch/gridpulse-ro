@@ -137,14 +137,27 @@ def save_backtest(conn, run_id, preds, scores, test_months) -> None:
             )
 
 
+# A few missing lag_48 hours are normal: around the autumn DST change "48 h ago" reaches one
+# hour into D-1 (not yet observed), and the source sometimes has a gap that night.
+# LightGBM handles NaN; only a missing day of load means ingest did not run.
+MAX_MISSING_LAG_48 = 3
+
+
+def check_lag_48(target: pd.DataFrame, day: date) -> None:
+    missing = int(target["lag_48"].isna().sum())
+    if missing > MAX_MISSING_LAG_48:
+        raise RuntimeError(f"load for {day} minus 2 days is missing ({missing} h); ingest first")
+    if missing:
+        log.warning("%s: %d hour(s) without lag_48, predicting with NaN", day, missing)
+
+
 def predict_day(conn: psycopg.Connection, day: date) -> int:
     """Train on everything known and forecast the 23-25 hours of local day `day`."""
     feat = build_features(load_frame(conn))
     target = feat[feat["local_day"] == day]
     if target.empty or target["temp_forecast"].isna().any():
         raise RuntimeError(f"no weather forecast for {day} yet; ingest open-meteo first")
-    if target["lag_48"].isna().any():
-        raise RuntimeError(f"load for {day} minus 2 days is missing; ingest first")
+    check_lag_48(target, day)
     # Issued on the morning of D-1: train only on hours that had happened by then.
     cutoff = target.index.min() - pd.Timedelta(hours=24)
     model = fit(feat[feat.index < cutoff])
