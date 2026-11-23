@@ -74,6 +74,8 @@ flowchart LR
 - **Zero is not the same as missing.** A dbt check found that the source has no nuclear data at all for September 2026, and no hard coal for October 2023 ([`warn_source_missing_for_whole_day.sql`](dbt/tests/warn_source_missing_for_whole_day.sql)).
 - **No look-ahead in the forecast.** Load lags start at 48 hours, and the model only sees the temperature forecast issued 48 hours ahead. A test fails if any feature peeks inside the last 48 hours ([`tests/test_ml_features.py`](tests/test_ml_features.py)).
 - **The agent cannot hurt the database.** Model-written SQL must parse as a single SELECT on the `marts` schema, gets a row limit, and runs in a read-only transaction with a timeout, on a role that cannot see raw data ([`sql_guard.py`](src/gridpulse/agent/sql_guard.py)).
+- **A revised day or a rewritten forecast leaves a trace.** A trigger writes every UPDATE or DELETE on the raw tables and on the issued forecasts to `ops.audit_log`, with the old and new values and the columns that changed ([`008_audit.sql`](src/gridpulse/sql/008_audit.sql), [`tests/test_audit.py`](tests/test_audit.py)).
+- **Indexes chosen from measured plans.** `EXPLAIN (ANALYZE, BUFFERS)` on the app's own queries showed full-table scans of 314k rows; an index on `local_day` took the query every page runs from 98 ms to 0.02 ms ([`docs/performance.md`](docs/performance.md), [`scripts/explain_app_queries.py`](scripts/explain_app_queries.py)).
 - **The eval cannot go stale.** Each of the 25 data questions computes its expected answer with live SQL, and the grader reads English and Romanian number formats ([`evals/agent_questions.yaml`](evals/agent_questions.yaml)).
 
 ## Run it locally
@@ -93,7 +95,7 @@ Tests: `createdb gridpulse_test && TEST_DATABASE_URL=postgresql://postgres@local
 
 ## Design decisions
 
-Short ADRs in [`docs/adr/`](docs/adr/): why Airflow runs on a free VM, why Neon, the raw layer, the no-leakage rules, the near-holiday experiment, the model choice for the agent, and the SQL guardrails.
+Short ADRs in [`docs/adr/`](docs/adr/): why Airflow runs on a free VM, why Neon, the raw layer, the no-leakage rules, the near-holiday experiment, the model choice for the agent, the SQL guardrails, and the audit trigger.
 
 ## Data and licences
 

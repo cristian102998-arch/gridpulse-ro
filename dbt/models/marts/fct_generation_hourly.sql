@@ -1,3 +1,7 @@
+-- Index on local_day: the app filters this table by a range of local days on every page
+-- (latest_day, the Mix chart). Measured in docs/performance.md.
+{{ config(indexes=[{'columns': ['local_day']}]) }}
+
 -- Hourly generation per source. The average MW over an hour equals the MWh produced in it.
 -- Hours are grouped in UTC, so the extra hour of a 25-hour day stays a separate hour.
 

@@ -1,3 +1,6 @@
+-- Index on local_day: the Forecast page reads a window of local days. See docs/performance.md.
+{{ config(indexes=[{'columns': ['local_day']}]) }}
+
 -- Every load forecast we have for each hour, next to the actual load.
 -- naive_168h: the load one week earlier. It is known days in advance, so it never leaks.
 -- lgbm: the live day-ahead forecast when it exists, otherwise the out-of-sample prediction from
