@@ -27,7 +27,11 @@ TABLES = (
     "ml.backtest_metrics",
     "ml.backtest_predictions",
     "ops.pipeline_runs",
+    "ops.audit_log",
 )
+
+# Identity columns whose sequence must move past the restored values.
+IDENTITY_COLUMNS = (("ops.pipeline_runs", "run_id"), ("ops.audit_log", "id"))
 
 
 def _folder(root: str, day: date) -> str:
@@ -83,6 +87,8 @@ def restore_backup(conn: psycopg.Connection, root: str, day: date) -> dict[str, 
         for table in reversed(TABLES):
             conn.execute(f"truncate {table}")
         for table in TABLES:
+            if table not in expected:
+                continue  # a backup taken before this table existed (ops.audit_log)
             # COPY writes identity values as given (like OVERRIDING SYSTEM VALUE), so run_ids
             # survive; the sequence is moved past them below.
             with (
@@ -99,8 +105,9 @@ def restore_backup(conn: psycopg.Connection, root: str, day: date) -> dict[str, 
                 raise RuntimeError(
                     f"{table}: restored {restored[table]} rows, expected {expected[table]}"
                 )
-        conn.execute(
-            "select setval(pg_get_serial_sequence('ops.pipeline_runs', 'run_id'),"
-            " coalesce((select max(run_id) from ops.pipeline_runs), 1))"
-        )
+        for table, column in IDENTITY_COLUMNS:
+            conn.execute(
+                f"select setval(pg_get_serial_sequence('{table}', '{column}'),"
+                f" coalesce((select max({column}) from {table}), 1))"
+            )
     return restored
